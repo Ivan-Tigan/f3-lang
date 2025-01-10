@@ -1,6 +1,9 @@
 :- debug(parser).
 % Map to track variables during parse
 :- dynamic parse_vars/1.
+:- dynamic p/3.
+:- multifile p/3.
+
 :- initialization(assertz(parse_vars([]))).
 
 reset_parse_vars :-
@@ -32,6 +35,7 @@ debug_parse(Codes) :-
 
 % Top level - handle multiple statements
 top_statement(Statements) -->
+    blanks,
     statement(First),
     remaining_top_statements(Rest),
     { append(First, Rest, Statements) }.
@@ -44,6 +48,7 @@ remaining_top_statements(Statements) -->
 
 % A statement ends with a period
 statement(Triples) -->
+    blanks,
     triple(Triples),
     ".",
     blanks.
@@ -89,10 +94,28 @@ node(Node) -->
         identifier(Node)
     |   
         list_node(Node)
-    |   
+    |    
         nested_graph(Node)
     ).
+% New predicate to parse double-colon separated lists
+colon_list_node(Items) -->
+    node(FirstItem),
+    blanks,
+    "::",
+    blanks,
+    colon_list_items(RestItems),
+    { Items = [FirstItem|RestItems] }.
 
+colon_list_items([Item|Rest]) -->
+    node(Item),
+    blanks,
+    ( 
+        "::",
+        blanks,
+        colon_list_items(Rest)
+    |
+        { Rest = [] }
+    ).
 symbol(Symbol) -->
     symbol_chars(Chars),
     symbol_end,
@@ -165,10 +188,10 @@ identifier(Id) -->
     { atom_codes(Name, [C|Cs]),
       (char_type(C, upper) ->
     %   term_to_atom(UnquotedName, Name),
-      Id = '$VAR'(Name),
-      write_canonical(Id), write(' for '), 
-      write_canonical(Name), 
-       nl
+      Id = '$VAR'(Name), !
+    %     write_canonical(Id), write(' for '), 
+    %   write_canonical(Name), 
+    %    nl
 
 
          
@@ -216,6 +239,7 @@ blanks --> [].
 % Tests
 test_all :-
     writeln('Running all tests...'),
+    test_todo,
     test_basic_triple,
     test_multiple_objects,
     test_multiple_predicates,
@@ -227,6 +251,47 @@ test_all :-
     test_symbols,
     writeln('All tests passed!'),
     halt.
+    % !.
+test_todo :- 
+    writeln("Testing todo"),
+    parse_triples("
+        html attribute class, href, id, l1, l2, l3; element a, div.
+
+        homePage a page; path \"\"; content homePageContent.
+        homePageContent a div; class \"flex w-full h-full justify-center\"; child [homePageContent inner].
+        [homePageContent inner] a div; class \"flex flex-col justify-start p-2\".
+
+    
+        [db \"world\"] hasGraph {
+            \"user_1\" a user; name \"Bob\"; hasTask \"user_1/task_1\", \"user_1/task_2\", \"user_1/task_3\".
+            \"user_1/task_1\" name \"Bob's first task\".
+            \"user_1/task_2\" name \"Bob's second task\".
+            \"user_1/task_3\" name \"Bob's third task\".
+        }.
+
+        { 
+            [db \"world\"] hasSubGraph { UID a user; name Name. }.
+            [\"user/\" UID] sconcat Path.
+        } => {
+            [homePageContent inner] child [homePageContent inner Path].
+            [homePageContent inner Path] a a; href Path; text Name.
+            [userpage UID Name] a page; path Path; content [userpage UID Name content].
+            [userpage UID Name content] a div; class \"flex w-full h-full justify-center\"; child [userpage UID Name content inner].
+            [userpage UID Name content inner] a div; class \"flex flex-col justify-start p-2\".
+        }.
+
+        { 
+            a b c.
+            [db \"world\"] hasSubGraph { UID a user; name Name; hasTask T. T name TName. }.
+            } => {
+            [userpage UID Name content inner] child [userpage UID Name content inner T].
+            [usepage UID Name content inner T] a div; text TName. 
+        }.
+
+
+    ", Triples),
+    writeln(Triples).
+
 test_nested_graphs :-
     writeln('Testing deeply nested graphs...'),
     parse_triples("db hasGraph { g1 contains { \"user_1\" name \"bob\". }. g2 type \"group\". }.", Triples),
@@ -294,6 +359,13 @@ test_symbols :-
     writeln(T7),
     parse_triples("x |> y.", T8),
     writeln(T8).
-
-:- nodebug(parser).
+test_colon_lists :-
+    writeln('Testing colon-separated lists...'),
+    parse_triples("bob friends alice::carol::david.", T1),
+    writeln(T1),
+    parse_triples("x path 1::2::3::4.", T2),
+    writeln(T2),
+    parse_triples("data values \"hello\"::123::world.", T3),
+    writeln(T3).
+% :- nodebug(parser).
 % :- test_all.

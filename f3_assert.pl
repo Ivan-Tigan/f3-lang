@@ -1,8 +1,11 @@
+% :- module(f3_assert, [p/3, process_input/1]).
+:- use_module(library(crypto)).
+
 :- [f3p].  % Include the parser file
 
 % Make p/3 dynamic so we can assert to it
 :- dynamic p/3.
-
+:- multifile p/3.
 % Builtins
 builtin(>).
 builtin(<).
@@ -10,6 +13,8 @@ builtin(>=).
 builtin(<=).
 builtin(sconcat).
 builtin(collect).
+builtin(query).
+builtin(sha256). 
 
 b(A, >, B) :- A > B.
 b(A, <, B) :- A < B.
@@ -17,12 +22,31 @@ b(A, >=, B) :- A >= B.
 b(A, =<, B) :- A =< B.
 % String concatenation builtin
 b(XS, sconcat, Res) :- 
-   atomic_list_concat(XS, '', Res).
+   atomic_list_concat(XS, '', A),
+   atom_string(A, Res).
 b([Path, graph(G)], collect, Results) :-
     % Convert graph pattern to conjunction
     list_to_conjunction(G, Conjunction),
     % Collect first argument from each triple that matches the pattern
-    bagof(Path, Conjunction, Results).
+    findall(Path, Conjunction, Results).
+
+
+b(graph(G1s), query, graph(G2s)) :-
+   % writeln('Query:'),
+   % writeln(G2s),
+   % writeln('Against:'),
+   % writeln(G1s),
+   query_match(G2s, G1s).
+b(Input, sha256, Hash) :-
+    atomic(Input),
+    crypto_data_hash(Input, Hash, [algorithm(sha256), encoding(hex)]).
+
+query_match([], _).
+query_match([p(S,P,O)|Rest], Source) :-
+   % writeln('Matching:'),
+   % writeln(p(S,P,O)),
+   member(p(S,P,O), Source),
+   query_match(Rest, Source).
 % Main predicate to process input
 process_input(Filename) :-
    read_file_to_string(Filename, Input, []),
@@ -59,7 +83,10 @@ write_facts_and_rules(Facts, Rules) :-
    % Read and print the file contents
    read_file_to_string(File, Contents, []),
    format("Generated facts and rules:~n~w~n", [Contents]),
-   consult(File).
+   load_files(File, [dynamic(true)]).  % Use load_files with dynamic option
+
+   consult(File)
+   .
 
 % Process single rule to stream
 process_rule(p(graph(G1), =>, graph(G2)), Stream) :-
@@ -71,7 +98,10 @@ process_rule(p(graph(G1), =>, graph(G2)), Stream) :-
    )).
 
 % Convert a single condition to the right form (b/3 or p/3)
-transform_condition(p(S,P,O), b(S,P,O)) :- builtin(P), !.
+transform_condition(p(S,P,O), b(S,P,O)) :- 
+   ground(P),  % Only check for builtins if P is ground
+   builtin(P),
+   !.
 transform_condition(p(S,P,O), p(S,P,O)).
 
 % Convert list of conditions to conjunction, transforming builtins
@@ -98,7 +128,7 @@ query(Pattern) :-
    maplist(writeln, Facts).
 
 % Main entry point
-:- initialization(main).
-main :-
-   current_prolog_flag(argv, [Filename|_]),
-   process_input(Filename).
+% :- initialization(main).
+% main :-
+%    current_prolog_flag(argv, [Filename|_]),
+%    process_input(Filename).
