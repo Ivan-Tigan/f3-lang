@@ -1,0 +1,32 @@
+{
+  "version": "4",
+  "specifiers": {
+    "npm:swipl-wasm@*": "4.0.19",
+    "npm:tau-prolog@*": "0.3.4"
+  },
+  "npm": {
+    "@types/emscripten@1.39.13": {
+      "integrity": "sha512-cFq+fO/isvhvmuP/+Sl4K4jtU6E23DoivtbO4r50e3odaxAiVdbfSYRDdJ4gCdxx+3aRjhphS5ZMwIH4hFy/Cw=="
+    },
+    "readline-sync@1.4.9": {
+      "integrity": "sha512-mp5h1N39kuKbCRGebLPIKTBOhuDw55GaNg5S+K9TW9uDAS1wIHpGUc2YokdUMZJb8GqS49sWmWEDijaESYh0Hg=="
+    },
+    "swipl-wasm@4.0.19": {
+      "integrity": "sha512-pslPurmGiAFrV+NLShE6zn1zojU72XFUsId5AwdjyKf+Lrqefd1zeAEGpmHelZjgN3TvlBaO+Sj461LKwfBMjA==",
+      "dependencies": [
+        "@types/emscripten"
+      ]
+    },
+    "tau-prolog@0.3.4": {
+      "integrity": "sha512-CEEa6C3IRPGN5GuXptBjLWOrF2x7aE06CP/p54oXJciBBfokkPom30uRNhKgbBAz1+AeuM1KtK2JMa0R3u+pRA==",
+      "dependencies": [
+        "readline-sync"
+      ]
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@std/assert@1"
+    ]
+  }
+}

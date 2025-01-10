@@ -1,0 +1,8 @@
+bob a chef; age 20; works_at "Italian Restaurant".
+alice a chef; age 25; works_at "French Bistro".
+carol a waiter; age 22; works_at "Italian Restaurant".
+dave a waiter; age 30; works_at "French Bistro".
+lengo hasList [ 1 + [2 * [ 3 + 5 ]] ].
+
+{ X a chef. X works_at "Italian Restaurant". } => 
+{ X knows "Italian cuisine". X skills "pasta making". }.
