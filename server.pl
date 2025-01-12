@@ -69,34 +69,40 @@ handle_method(post, Request) :-
     format(user_error, 'Guid: ~w\n', [Guid]),
     json_to_triples(JSON, GuidJSON, JSONTriples),
     % Facts to assert
+    JSONGraph = graph(JSONTriples),
+    atom_string(Path, PathString),
     Facts = [
         p(Guid, a, inPOST),
-        p(Guid, path, Path),
-        p(Guid, data, graph(JSONTriples))
+        p(Guid, path, PathString),
+        p(Guid, data, JSONGraph)
     ],
-    
-    forall(member(Fact, Facts), assertz(Fact)),
+    format(user_error, "Facts to assert: ~q ~n", [Facts]),
+    b(JSONGraph, query, graph([
+        p(U, user, Name), p(U, taskName, T)])),
+    format(user_error, "Query facts ~q ~q ~q:~n", [U, Name, T]),
+    forall(member(Fact, Facts), asserta(Fact)),
     format(user_error, "Query mutations ~w:~n", [Guid]),
     forall(p(DB, mutations, Mutations), format(user_error, "Mutations: ~w~n", [Mutations])),
-
-    format(user_error, "Checking asserted facts for Guid ~w:~n", [Guid]),
-    forall(p(Guid, Pred, Obj), 
-           format(user_error, "Found: p(~w, ~w, ~w)~n", [Guid, Pred, Obj])),
-            retractall(p(Guid, _, _)),
-    format(user_error, "Retracted all facts for Guid ~w~n", [Guid]),
+    
+    % format(user_error, "Checking asserted facts for Guid ~w:~n", [Guid]),
+    % forall(p(Guid, Pred, Obj), 
+    %        format(user_error, "Found: p(~w, ~w, ~w)~n", [Guid, Pred, Obj])),
+    %         retractall(p(Guid, _, _)),
+    % format(user_error, "Retracted all facts for Guid ~w~n", [Guid]),
     
     
     % Verify they're gone
     format(user_error, "Verifying retraction - remaining facts for Guid ~w:~n", [Guid]),
-    forall(p(Guid, Pred, Obj), 
-           format(user_error, "Still found: p(~w, ~w, ~w)~n", [Guid, Pred, Obj])),
+    forall(p(G, data, Obj), 
+           format(user_error, "Still found: ~q ~n", [p(G, data, Obj)])),
 
     reply_json_dict(_{status: success, guid: Guid}).
 
-uuid(Id) :-
+uuid(Guid) :-
     get_time(Now),
-    format(atom(Id), 'post_~w', [Now]).
-
+    format(atom(Id), 'post_~w', [Now]),
+    b(Id, sha256, G),
+    sub_string(G, 0, 6, _, Guid).
 :- initialization(main, main).
 
 main([F3File, Port]) :-

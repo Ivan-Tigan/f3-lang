@@ -4,8 +4,14 @@ homePage a page; path "/users"; content homePageContent.
 homePageContent a div; class "flex w-full h-full justify-center"; child [homePageContent inner].
 [homePageContent inner] a div; class "flex flex-col justify-start p-2".
 
-{ Guid a inPOST; path "/add_task"; data { X user UserId; taskName TaskName. }.  Guid sha256 TaskId.  } => 
-{ [db "world"] mutations [insert { UserId hasTask TaskId. TaskId name TaskName. }].  }.
+{ 
+    Guid a inPOST; path "/add_task"; [data >> query] { X user UserId; taskName TaskName. }.  
+    Guid = TaskId.
+
+} => 
+{ [db "world"] mutations { UserId hasTask TaskId. TaskId name TaskName. }.  }.
+
+
 
 { Guid a inPOST; path "/delete_task"; data { X task TaskId. }.  } => 
 { [db "world"] mutations [ delete { Uid hasTask TaskId. TaskId P O. }].}.
@@ -29,6 +35,11 @@ homePageContent a div; class "flex w-full h-full justify-center"; child [homePag
     [userpage UID Name] a page; path Path; content [userpage UID Name content].
     [userpage UID Name content] a div; class "flex w-full h-full justify-center"; child [userpage UID Name content inner].
     [userpage UID Name content inner] a div; class "flex flex-col justify-start p-2".
+}.
+
+{ [db "world"] hasGraph {| UID a user; name Name; hasTask T. |}.  } => {
+    [userpage UID Name content inner] child [userpage UID Name content inner T].
+    [userpage UID Name content inner T] a div; text T. 
 }.
 
 { [db "world"] hasGraph G. G query { UID a user; name Name; hasTask T.}.  } => {

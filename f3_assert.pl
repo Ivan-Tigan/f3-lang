@@ -7,6 +7,7 @@
 :- dynamic p/3.
 :- multifile p/3.
 % Builtins
+builtin(=).
 builtin(>).
 builtin(<).
 builtin(>=).
@@ -15,7 +16,9 @@ builtin(sconcat).
 builtin(collect).
 builtin(query).
 builtin(sha256). 
+builtin([X, >>, Y]).
 
+b(A, =, B) :- A = B.
 b(A, >, B) :- A > B.
 b(A, <, B) :- A < B.
 b(A, >=, B) :- A >= B.
@@ -29,7 +32,10 @@ b([Path, graph(G)], collect, Results) :-
     list_to_conjunction(G, Conjunction),
     % Collect first argument from each triple that matches the pattern
     findall(Path, Conjunction, Results).
-
+b(A, [X, >>, Y], B) :- builtin(X), builtin(Y), !, b(A, X, C), b(C, Y, B) .
+b(A, [X, >>, Y], B) :- builtin(X), !, b(A, X, C), p(C, Y, B) .
+b(A, [X, >>, Y], B) :- builtin(Y), !, p(A, X, C), b(C, Y, B) .
+b(A, [X, >>, Y], B) :- p(A, X, C), p(C, Y, B) .
 
 b(graph(G1s), query, graph(G2s)) :-
    % writeln('Query:'),
@@ -37,10 +43,13 @@ b(graph(G1s), query, graph(G2s)) :-
    % writeln('Against:'),
    % writeln(G1s),
    query_match(G2s, G1s).
+% b(Input, sha256, Hash) :-
+%     atomic(Input),
+%     crypto_data_hash(Input, Hash, [algorithm(sha256), encoding(hex)]).
 b(Input, sha256, Hash) :-
     atomic(Input),
-    crypto_data_hash(Input, Hash, [algorithm(sha256), encoding(hex)]).
-
+    term_string(Input, InputString),  % Convert input to string
+    crypto_data_hash(InputString, Hash, [algorithm(sha256), encoding(octet)]).
 query_match([], _).
 query_match([p(S,P,O)|Rest], Source) :-
    % writeln('Matching:'),
@@ -74,16 +83,14 @@ write_facts_and_rules(Facts, Rules) :-
    format("Created temporary file: ~w~n", [File]),
    write(Stream, ':- dynamic p/3.\n\n'),
    % Write facts first
-   forall(member(Fact, Facts),
-          format(Stream, '~q.~n', [Fact])),
-   % Then write rules
+  % Then write rules
    forall(member(Rule, Rules),
           process_rule(Rule, Stream)),
    close(Stream),
    % Read and print the file contents
    read_file_to_string(File, Contents, []),
    format("Generated facts and rules:~n~w~n", [Contents]),
-   load_files(File, [dynamic(true)]).  % Use load_files with dynamic option
+   % load_files(File, [dynamic(true)]).  % Use load_files with dynamic option
 
    consult(File)
    .
@@ -94,6 +101,7 @@ process_rule(p(graph(G1), =>, graph(G2)), Stream) :-
    forall(member(M, G2), (
        build_rule(M, G1, Rule),
        format('Creating rule: ~w~n', [Rule]),
+      %  assertz(Rule)
        format(Stream, '~q.~n', [Rule])
    )).
 
