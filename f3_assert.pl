@@ -1,5 +1,6 @@
 % :- module(f3_assert, [p/3, process_input/1]).
 :- use_module(library(crypto)).
+:- use_module(library(pcre)).
 
 :- [f3p].  % Include the parser file
 
@@ -17,6 +18,7 @@ builtin(collect).
 builtin(query).
 builtin(sha256). 
 builtin([X, >>, Y]).
+builtin(replaceQuotes).
 
 b(A, =, B) :- A = B.
 b(A, >, B) :- A > B.
@@ -27,6 +29,9 @@ b(A, =<, B) :- A =< B.
 b(XS, sconcat, Res) :- 
    atomic_list_concat(XS, '', A),
    atom_string(A, Res).
+b(X, replaceQuotes, Y) :-
+   replace_substring(X, "'", "\"", Res).
+   
 b([Path, graph(G)], collect, Results) :-
     % Convert graph pattern to conjunction
     list_to_conjunction(G, Conjunction),
@@ -50,6 +55,14 @@ b(Input, sha256, Hash) :-
     atomic(Input),
     term_string(Input, InputString),  % Convert input to string
     crypto_data_hash(InputString, Hash, [algorithm(sha256), encoding(octet)]).
+replace_substring(String, To_Replace, Replace_With, Result) :-
+    (    append([Front, To_Replace, Back], String)
+    ->   append([Front, Replace_With, Back], R),
+         replace_substring(Back, To_Replace, Replace_With, Result)
+    ;    Result = String
+    ).
+
+
 query_match([], _).
 query_match([p(S,P,O)|Rest], Source) :-
    % writeln('Matching:'),

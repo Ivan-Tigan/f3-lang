@@ -251,22 +251,18 @@ digits([D|Ds]) -->
    { code_type(D, digit) },
    (digits(Ds) ; { Ds = [] }).
 
-   quoted_string(String) -->
-    "\"",
-    string_chars(Chars),
-    "\"",
-    { string_chars(String, Chars) },
-    blanks.
- 
- string_chars([]) --> [].
- string_chars([C|Cs]) -->
-    "\\", "\"",  % Match backslash followed by quote
-    { C = 34 },  % ASCII code for double quote
-    string_chars(Cs).
- string_chars([C|Cs]) -->
-    [C],
-    { C \= 34 }, % Compare with ASCII code for double quote
-    string_chars(Cs).
+quoted_string(String) -->
+   "\"",
+   string_chars(Chars),
+   "\"",
+   { string_chars(String, Chars) },
+   blanks.
+
+string_chars([]) --> [].
+string_chars([C|Cs]) -->
+   [C],
+   { C \= 0'" },
+   string_chars(Cs).
 
 blanks --> [C], { code_type(C, space) }, blanks.
 blanks --> [].
@@ -325,12 +321,7 @@ test_nested_graphs :-
     writeln('Testing multiple nested graphs...'),
     parse_triples("db hasGraph ( g1 data ( a b c. ); metadata ( x y z. ). ).", Triples2),
     writeln(Triples2).
-test_escaped_quotes :-
-    writeln('Testing escaped quotes...'),
-    parse_triples("
-bob \"ws-connected\" \"send:{\\\"message\\\": \\\"Hello, I just connected!\\\"}\". 
-    ", Triples),
-    writeln(Triples).
+
 test_basic_triple :-
     writeln('Testing basic triple...'),
     parse_triples("bob name \"Robert\".", Triples),
@@ -343,7 +334,7 @@ test_multiple_objects :-
 
 test_multiple_predicates :-
     writeln('Testing multiple predicates...'),
-    parse_triples("bob likes alice; hates \"  carol \\\"  \"; knows david.", Triples),
+    parse_triples("bob likes alice; hates carol; knows david.", Triples),
     writeln(Triples).
 
 test_graph :-
