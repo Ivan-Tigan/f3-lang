@@ -42,6 +42,7 @@ handle_websocket(Request, WebSocket) :-
     session_id_cookie(Request, SessionIdCookie),
     member(path(PathAtom), Request),
     atom_string(PathAtom, Path),
+    asserta(session_path_socket(SessionIdCookie, Path, WebSocket)),
     (   (p(res, is, [Path, ->, Content]);
         atom_string(TempPathAtom, Path),
         p(res, is, [TempPathAtom, ->, Content]))
@@ -52,16 +53,7 @@ handle_websocket(Request, WebSocket) :-
         throw(http_reply(not_found(Path)))
     ).
     
-    asserta(session_path_socket(SessionIdCookie, Path, WebSocket)),
-    forall(
-        session_path_socket(SessionIdCookie, P, So), 
-        % (
-        %     p(res, is, [Path, ->, C])
-        %     ; 
-        %     p(res, is, [PathAtom, ->, C]), 
-        %     atom_string(PathAtom, Path)
-        % )
-        , 
+    forall( session_path_socket(SessionIdCookie, P, So),  
         
         format(user_error, "Found portal: ~w ~w ~w~n", [S, P, So])
         % ws_send(Socket, text(C))
@@ -85,24 +77,24 @@ handle_ws_message(Request, Message, WebSocket) :-
     % Echo back the message for now
     ws_send(WebSocket, Message).
 
-
+% Modified handle_portals with better error handling
 handle_portals :-
     format(user_error, "Handling portals...~n", []),
     forall((
-        session_path_socket(Session, Path, Socket), 
-        format(user_error, "Found socket: ~w ~w ~w~n", [Session, Path, Socket])
-        % (
-        %     p(res, is, [Path, ->, C])
-        %     ; 
-        %     p(res, is, [PathAtom, ->, C]), 
-        %     atom_string(PathAtom, Path)
-        % )
+        session_path_socket(Session, Path, Socket),
+        format(user_error, "Found socket: ~w ~w ~w~n", [Session, Path, Socket]),
+        (
+            p(res, is, [Path, ->, C])
+            ; 
+            p(res, is, [PathAtom, ->, C]), 
+            atom_string(PathAtom, Path)
+        )
         ), 
         (
-        format(user_error, "Found portal: ~w ~w ~w~n", [Session, Path, C])
-        % ws_send(Socket, text(C))
-        )),
-    format(user_error, "Done handling portals~n", []).
+        format(user_error, "Found portal: ~w ~w ~w~n", [Session, Path, C]),
+        safe_ws_send(Socket, text(C))
+        )).
+
 
 handle_all(Request) :-
     format(user_error, "Received request: ~w~n", [Request]),
@@ -234,7 +226,16 @@ assertz_once(Fact) :-
     assertz(Fact).
 assertz_once(_).  % If fact exists, succeed silently
     
-    
+    % Add error handling to WebSocket sends
+safe_ws_send(Socket, Message) :-
+    catch(
+        ws_send(Socket, Message),
+        Error,
+        (
+            format(user_error, "WebSocket send failed: ~w~n", [Error]),
+            retractall(session_path_socket(_, _, Socket))
+        )
+    ).
 
 main([F3File, Port]) :-
     atom_number(Port, PortNum),
