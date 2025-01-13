@@ -3,10 +3,21 @@
 :- use_module(library(pcre)).
 
 :- [f3p].  % Include the parser file
+:- dynamic loaded/1.
+:- multifile loaded/1.
 
 % Make p/3 dynamic so we can assert to it
 :- dynamic p/3.
 :- multifile p/3.
+
+load(DB) :-
+    (loaded(DB) -> 
+        true ;
+        (exists_file(DB) -> consult(DB) ; true),
+        assertz(loaded(DB))
+    ).
+
+
 % Builtins
 builtin(=).
 builtin(>).
@@ -17,18 +28,31 @@ builtin(sconcat).
 builtin(collect).
 builtin(query).
 builtin(sha256). 
+builtin([Index]) :- number(Index), !.
+builtin(hasGraph).
 builtin([X, >>, Y]).
 builtin(replaceQuotes).
+builtin(lconcat).
+builtin(not).
 
 b(A, =, B) :- A = B.
 b(A, >, B) :- A > B.
 b(A, <, B) :- A < B.
 b(A, >=, B) :- A >= B.
 b(A, =<, B) :- A =< B.
+
+b(system, not, p(A,B,C)) :- \+ p(A,B,C).
 % String concatenation builtin
 b(XS, sconcat, Res) :- 
    atomic_list_concat(XS, '', A),
    atom_string(A, Res).
+
+b([Xs, Ys], lconcat, Res) :- 
+   append(Xs, Ys, Res).
+b(Xs, [Index], Element) :- 
+    number(Index),
+    !,
+    nth1(Index, Xs, Element).
 b(X, replaceQuotes, Y) :-
    replace_substring(X, "'", "\"", Res).
    
@@ -69,6 +93,51 @@ query_match([p(S,P,O)|Rest], Source) :-
    % writeln(p(S,P,O)),
    member(p(S,P,O), Source),
    query_match(Rest, Source).
+full_db_path(DBPath, FullPath) :-
+    atom_concat('db/', DBPath, FullPath).
+b([db, DBPath], hasGraph, P) :-
+   full_db_path(DBPath, FullPath),
+    load(FullPath),
+    p([db, DBPath], hasGraph, P).
+insert_db_fact(p([db, DBPath], hasGraph, P)) :-
+    full_db_path(DBPath, FullPath),
+    load(FullPath),
+    F = p([db, DBPath], hasGraph, P),
+    (p([db, DBPath], hasGraph, P) -> 
+        true
+    ;   
+        assertz(F),
+        file_directory_name(FullPath, Dir),
+        % Create directory if it doesn't exist
+        (exists_directory(Dir) -> 
+            true 
+        ;   
+            make_directory(Dir)
+        ),
+
+        open(FullPath, append, Stream),
+        format(Stream, '~q.~n', [F]),
+        close(Stream)
+    ).
+delete_db_fact(p([db, DBPath], hasGraph, P)) :-
+    full_db_path(DBPath, FullPath),
+    F = p([db, DBPath], hasGraph, P),
+    % Create sed pattern by converting fact to quoted string
+    format(string(Pattern), "~q", [F]),
+    % Use single quotes around the pattern and escape single quotes in pattern
+    atomic_list_concat(['sed -i \'/^', Pattern, '\\.$/d\' ', FullPath], CommandUnescaped),
+    % Escape square brackets
+    split_string(CommandUnescaped, "[", "", Parts1),
+    atomic_list_concat(Parts1, "\\[", Temp1),
+    split_string(Temp1, "]", "", Parts2),
+    atomic_list_concat(Parts2, "\\]", Command),
+    
+    format(user_error, "~n Command: ~w~n", [Command]),
+    shell(Command),
+    format(user_error, "sed completed~n", []),
+    % Remove from memory
+    retract(F),
+    format(user_error, "fact deleted~n", []).
 % Main predicate to process input
 process_input(Filename) :-
    read_file_to_string(Filename, Input, []),

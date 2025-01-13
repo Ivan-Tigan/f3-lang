@@ -1,0 +1,6 @@
+p([db,"world"],hasGraph,p("user_1",hasTask,"72fd0d")).
+p([db,"world"],hasGraph,p("72fd0d",name,"task from frontend")).
+p([db,"world"],hasGraph,p("user_1",hasTask,"8ecaa0")).
+p([db,"world"],hasGraph,p("8ecaa0",name,"task from frontend 2")).
+p([db,"world"],hasGraph,p("user_1",hasTask,"1ab8d4")).
+p([db,"world"],hasGraph,p("1ab8d4",name,"test")).

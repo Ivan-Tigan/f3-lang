@@ -1,19 +1,19 @@
 html attribute class, href, id, type, name, value, 
 "hx-post", "hx-trigger", "hx-ext", "ws-connect", "ws-connected", 
-"ws-send", "hx-vals", "hx-headers", "ws-after-message", "ws-swap", "hs-ws",
+"ws-send", "hx-vals", "hx-headers", "ws-after-message", "ws-swap", "hs-ws", "hx-target",
 src; 
-element a, div, form, input, button, script.
+element a, main, header, footer, section, div, form, input, button, script, li, ul, nav.
 
 homePage a page; path "/users"; content homePageContent.
-homePageContent a div; class "flex w-full h-full justify-center"; child [homePageContent inner].
-[homePageContent inner] a div; class "flex flex-col justify-start p-2".
+homePageContent a main; child [homePageContent inner].
+[homePageContent inner] a section.
 
 
 ( Guid a inPOST; path "/add_task"; data { X user UserId; taskName TaskName. }. Guid = TaskId.) => 
 ( [db "world"] insert { UserId hasTask TaskId. TaskId name TaskName. }.  ).
 
-( Guid a inPOST; path "/delete_task"; data { X task TaskId. }.  ) => 
-(  [db "world"] delete { Uid hasTask TaskId. TaskId P O. }. ).
+( Guid a inPOST; path "/delete_task"; data { X task TaskId. }. ) => 
+( [db "world"] delete { Uid hasTask TaskId. TaskId P O. }. ).
 
 ( Guid a inPOST; path "/set_task_name"; data { X task TaskId; newName NewName. }.  ) => 
 ( [db "world"] delete { TaskId name OldName. }; insert { TaskId name NewName.}. ).
@@ -33,10 +33,14 @@ htmxSessionHeaders a script; text "(() => {htmx.config.headers = { 'X-Session-ID
     X "hx-ext" "ws"; "hx-trigger" "load"; "ws-connect" Path. 
     X child Path.
     Path a div; id PortalId.   
-    [Path portalPage] a page; path Path; content [Path portalPage content].
+    [Path portalPage] a portalPage; path Path; content [Path portalPage content].
     [Path portalPage content] a div; id PortalId.
 ).
-
+(1 = 2. X children {S P O.}. [X [S]] lconcat ChildId.  ) => ( X child ChildId. ChildId P O. ).
+[header] a header; child [header nav]. 
+[header nav] a nav; child [header nav ul1], [header nav ul2]. 
+[header nav ul1] a ul; child [header nav ul1 li1]. [header nav ul1 li1] a li; text "Logo".
+[header nav ul2] a ul; child [header nav ul2 li1]. [header nav ul2 li1] a li; child [header nav ul2 li1 a]. [header nav ul2 li1 a] a a; href "/users"; text "Users".
 (  
     [db "world"] hasGraph { UID a user; name Name. }.
     ["/user/" UID] sconcat Path.
@@ -45,8 +49,8 @@ htmxSessionHeaders a script; text "(() => {htmx.config.headers = { 'X-Session-ID
     [homePageContent inner] child [homePageContent inner Path].
     [homePageContent inner Path] a a; id "hello"; href Path; text Name.
     [userpage UID Name] a page; path Path; content [userpage UID Name content].
-    [userpage UID Name content] a div;  class "flex w-full h-full justify-center"; 
-        child [userpage UID Name content inner], 
+    [userpage UID Name content] a main; class "container";  
+        child [header], [userpage UID Name content inner], 
         htmxScript, htmxJsonPostExtension, htmxWSExtension.
     [userpage UID Name content inner] a div; 
         class "flex flex-col justify-start p-2"; 
@@ -55,15 +59,19 @@ htmxSessionHeaders a script; text "(() => {htmx.config.headers = { 'X-Session-ID
             [userpage UID Name content inner insert].
     [userpage UID Name content inner tasks] a div; portal PortalPath.
     
-    [userpage UID Name content inner insert] a form; "hx-post" "/add_task";  "hx-trigger" "submit"; "hx-ext" "json-enc";
+    [userpage UID Name content inner insert] a form; 
+        "hx-post" "/add_task";  "hx-trigger" "submit"; "hx-ext" "json-enc"; "hx-target" "#response-container";
         class "flex flex-col justify-start p-2"; child 
         [userpage UID Name content inner insert user],
         [userpage UID Name content inner insert text], 
-        [userpage UID Name content inner insert button].
+        [userpage UID Name content inner insert button],
+        [userpage UID Name content inner insert response]
+        .
 
     [userpage UID Name content inner insert user] a input; type "hidden"; name "user"; value UID.
     [userpage UID Name content inner insert text] a input; type "text"; name "taskName".
     [userpage UID Name content inner insert button] a button; type "submit"; text "Add task".
+    [userpage UID Name content inner insert response] a div; id "response-container".
  
 ).
 
@@ -95,7 +103,7 @@ htmxSessionHeaders a script; text "(() => {htmx.config.headers = { 'X-Session-ID
 ( html element El. X a El; text T.  ) => ( X innerHTML T. ).
 
 ( 
-    html element El. X a El.
+    html element El. X a El. system not {X text SomeText.}.
     [T ( X child C. C hasHTML T. )] collect ChildrenList.
     ChildrenList sconcat ChildrenString.
 ) => ( X innerHTML ChildrenString.  ).
@@ -103,5 +111,11 @@ htmxSessionHeaders a script; text "(() => {htmx.config.headers = { 'X-Session-ID
 ( X innerHTML InnerHTML; hasLeftRightHTML [OpenTag CloseTag].  [OpenTag InnerHTML CloseTag] sconcat HTML.) => 
 ( X hasHTML HTML. ).
 
-( X a page; path P ; content C.  C hasHTML HTML. ) => 
+( X a portalPage; path P; content C. C hasHTML HTML. ) => 
 ( res is [P -> HTML]. ).
+
+( 
+    X a page; path P ; content C. C hasHTML HTML. 
+    ["<head><link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css\"></head><body>" HTML "</body>"] sconcat FullHTML.
+) => 
+( res is [P -> FullHTML]. ).

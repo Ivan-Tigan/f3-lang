@@ -37,38 +37,30 @@ handle_ws_request(Request) :-
     
     .
     
-handle_websocket(Request, WebSocket) :-
-    % ws_send(WebSocket, text("Hello 1")),
-    session_id_cookie(Request, SessionIdCookie),
-    member(path(PathAtom), Request),
-    atom_string(PathAtom, Path),
-    asserta(session_path_socket(SessionIdCookie, Path, WebSocket)),
-    (   (p(res, is, [Path, ->, Content]);
-        atom_string(TempPathAtom, Path),
-        p(res, is, [TempPathAtom, ->, Content]))
-    ->  format(user_error, "Found content for ~w ~n ~q ~n", [Path, Content]),
-        format('Content-type: text/html~n~n'),
-        ws_send(WebSocket, text(Content))
-    ;   format(user_error, "No content found for ~w~n", [Path]),
-        throw(http_reply(not_found(Path)))
-    ).
-    
-    forall( session_path_socket(SessionIdCookie, P, So),  
+    handle_websocket(Request, WebSocket) :-
+        session_id_cookie(Request, SessionIdCookie),
+        member(path(PathAtom), Request),
+        atom_string(PathAtom, Path),
+        asserta(session_path_socket(SessionIdCookie, Path, WebSocket)),
         
-        format(user_error, "Found portal: ~w ~w ~w~n", [S, P, So])
-        % ws_send(Socket, text(C))
+        % Send initial content
+        (   (p(res, is, [Path, ->, Content]);
+            atom_string(TempPathAtom, Path),
+            p(res, is, [TempPathAtom, ->, Content]))
+        ->  ws_send(WebSocket, text(Content))
+        ;   true
         ),
-    ws_receive(WebSocket, Message),
-    ( Message.opcode = close
-    -> 
-        % retract(session_path_socket(SessionIdCookie, Path, WebSocket)),
-        true  % Connection closed by client
-    ; 
-      handle_ws_message(Request, Message, WebSocket),
+        
+        % Start websocket message loop
+        ws_loop(Request, WebSocket).
     
-      handle_websocket(WebSocket)  % Loop to keep handling messages
-    ).
-
+    ws_loop(Request, WebSocket) :-
+        ws_receive(WebSocket, Message),
+        (   Message.opcode = close
+        ->  true
+        ;   handle_ws_message(Request, Message, WebSocket),
+            ws_loop(Request, WebSocket)
+        ).
 handle_ws_message(Request, Message, WebSocket) :-
     % memberchk(path(P), WebSocket),
     
@@ -151,11 +143,18 @@ handle_method(post, Request) :-
     format(user_error, "Query mutations ~w:~n", [Guid]),
     forall(p(DB, insert, Mutations), 
         (format(user_error, "Insert: ~w~n", [Mutations]),
-        assertz(p(DB, hasGraph, Mutations)))),
+        insert_db_fact(p(DB, hasGraph, Mutations)))),
     
-    forall(p(DB, delete, Mutations), 
-        (format(user_error, "Delete: ~w~n", [Mutations]),
-        retractall(p(DB, hasGraph, Mutations)))),
+forall(p(DB, delete, Pattern), 
+    (format(user_error, "Delete pattern: ~w~n", [Pattern]),
+     forall(p(DB, hasGraph, Actual),
+           (subsumes_term(Pattern, Actual) ->
+               (format(user_error, "Deleting matching fact: ~w~n", [Actual]),
+                delete_db_fact(p(DB, hasGraph, Actual)),
+                format(user_error, "~n Deletiosn done ~n", [])
+            )
+           ; true)))),
+
     
     % format(user_error, "Checking asserted facts for Guid ~w:~n", [Guid]),
     forall(p(Guid, Pred, Obj), 
