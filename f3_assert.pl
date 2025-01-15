@@ -2,7 +2,7 @@
 :- use_module(library(crypto)).
 :- use_module(library(pcre)).
 
-:- [f3p].  % Include the parser file
+% :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
 :- multifile loaded/1.
 
@@ -79,6 +79,10 @@ b(Input, sha256, Hash) :-
     atomic(Input),
     term_string(Input, InputString),  % Convert input to string
     crypto_data_hash(InputString, Hash, [algorithm(sha256), encoding(octet)]).
+b([db, DBPath], hasGraph, P) :-
+   full_db_path(DBPath, FullPath),
+    load(FullPath),
+    p([db, DBPath], hasGraph, P).
 replace_substring(String, To_Replace, Replace_With, Result) :-
     (    append([Front, To_Replace, Back], String)
     ->   append([Front, Replace_With, Back], R),
@@ -95,10 +99,6 @@ query_match([p(S,P,O)|Rest], Source) :-
    query_match(Rest, Source).
 full_db_path(DBPath, FullPath) :-
     atom_concat('db/', DBPath, FullPath).
-b([db, DBPath], hasGraph, P) :-
-   full_db_path(DBPath, FullPath),
-    load(FullPath),
-    p([db, DBPath], hasGraph, P).
 insert_db_fact(p([db, DBPath], hasGraph, P)) :-
     full_db_path(DBPath, FullPath),
     load(FullPath),
@@ -217,8 +217,54 @@ query(Pattern) :-
            Facts),
    maplist(writeln, Facts).
 
+triple_string(p(A,B,C), S) :- node_string(A, As), node_string(B, Bs), node_string(C, Cs), atomic_list_concat([As, Bs, Cs], " ", ST), atomic_list_concat([ST, '.'] , "", S), !.
+  
+
+node_string(N, S) :- string(N), atomic_list_concat(['"', N, '"'], '', S),!.
+node_string(N,S) :- atom(N), atom_string(N, S), !.
+node_string(N, S) :- number(N), number_string(N, S), !.
+node_string(Triple, S) :- triple_string(Triple, TS), atomic_list_concat(['{', ' ', TS, ' ', '}'], "", S), !.
+node_string(graph(Triples), S) :- maplist(triple_string, Triples, Ss), atomic_list_concat(Ss, '\n', SG), atomic_list_concat(['(', SG, ')'], ' ', S), !.
+node_string(Ns, S) :- atomic_list_concat(Ns, ' ', C), atom_string(C, S), !.
+print_node(T) :- node_string(T, S),!, writeln(S).
+print_node(T) :- write_canonical(T), nl.
+
 % Main entry point
 % :- initialization(main).
-% main :-
-%    current_prolog_flag(argv, [Filename|_]),
-%    process_input(Filename).
+:-style_check(-singleton).
+main :-
+   % consult(user_input),
+   [user],
+     tmp_file_stream(text, File, Stream),
+   % format("Created temporary file: ~w~n", [File]),
+   write(Stream, ':- dynamic p/3.\n\n'),
+
+   forall(p(graph(G1), => ,graph(G2)), (
+         forall(member(M, G2), (
+               build_rule(M, G1, Rule),
+               % format('Creating rule: ~w~n', [Rule]),
+               %  assertz(Rule)
+               format(Stream, '~q.~n', [Rule])
+            ))
+      )),
+   close(Stream),
+   % Read and print the file contents
+   read_file_to_string(File, Contents, []),
+   % format("Generated facts and rules:~n~w~n", [Contents]),
+   % load_files(File, [dynamic(true)]).  % Use load_files with dynamic option
+
+   consult(File),
+   % listing(p),
+   % format(user_error, "~n Results 1 :~n", []),
+   forall((p(system, query, [Path, graph(G)])), (
+          list_to_conjunction(G, Conjunction),
+    % Collect first argument from each triple that matches the pattern
+      findall(Path, Conjunction, Results),
+      maplist(print_node, Results)
+      
+      % writeln(Results)
+      ))
+
+   .
+   % current_prolog_flag(argv, [Filename|_]),
+   % process_input(Filename).

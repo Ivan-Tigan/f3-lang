@@ -6,9 +6,6 @@
 :- use_module(library(lambda)).
 :- use_module(library(apply)).
 
-:- dynamic parse_pos/1.
-:- initialization(assertz(parse_pos(pos(1,1)))).
-
 :- dynamic debug_mode/1.
 :- initialization(assertz(debug_mode(false))).
 

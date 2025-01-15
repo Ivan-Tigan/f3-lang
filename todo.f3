@@ -65,8 +65,7 @@ htmxSessionHeaders a script; text "(() => {htmx.config.headers = { 'X-Session-ID
         [userpage UID Name content inner insert user],
         [userpage UID Name content inner insert text], 
         [userpage UID Name content inner insert button],
-        [userpage UID Name content inner insert response]
-        .
+        [userpage UID Name content inner insert response].
 
     [userpage UID Name content inner insert user] a input; type "hidden"; name "user"; value UID.
     [userpage UID Name content inner insert text] a input; type "text"; name "taskName".
@@ -74,8 +73,6 @@ htmxSessionHeaders a script; text "(() => {htmx.config.headers = { 'X-Session-ID
     [userpage UID Name content inner insert response] a div; id "response-container".
  
 ).
-
-
 
 ( [db "world"] hasGraph { UID a user; name Name; hasTask T. T name TaskName. }. ["/ws/user/" UID] sconcat PortalPath. ) => ( 
     [PortalPath portalPage content] child [userpage UID Name content inner tasks T].
@@ -119,3 +116,6 @@ htmxSessionHeaders a script; text "(() => {htmx.config.headers = { 'X-Session-ID
     ["<head><link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css\"></head><body>" HTML "</body>"] sconcat FullHTML.
 ) => 
 ( res is [P -> FullHTML]. ).
+
+system runWebServer 3000.
+system query [ X ( [db "world"] hasGraph X.)].
