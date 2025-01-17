@@ -68,12 +68,12 @@ htmxSessionHeaders a script; text "(() => {htmx.config.headers = { 'X-Session-ID
         "hx-post" "/add_task";  "hx-trigger" "submit"; "hx-ext" "json-enc"; "hx-target" "#response-container";
         class "flex flex-col justify-start p-2"; 
         // child
-        children {
+        child {|
             user a input; type "hidden"; name "user"; value UID.
             text a input; type "text"; name "taskName".
             button a button; type "submit"; text "Add task".
             response a div; id "response-container"; children { testing a div; text "testing".}.
-        }.
+        |}.
     //     [userpage UID Name content inner insert user],
     //     [userpage UID Name content inner insert text], 
     //     [userpage UID Name content inner insert button],
