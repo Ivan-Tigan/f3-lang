@@ -18,3 +18,15 @@ p([db,"world"],hasGraph,p("user_1",hasTask,"9e19b5")).
 p([db,"world"],hasGraph,p("9e19b5",name,"Mircu")).
 p([db,"world"],hasGraph,p("user_1",hasTask,"c890d9")).
 p([db,"world"],hasGraph,p("c890d9",name,"Mirciu")).
+p([db,"world"],hasGraph,p("user_1",hasTask,"d8f61b")).
+p([db,"world"],hasGraph,p("d8f61b",name,"a")).
+p([db,"world"],hasGraph,p("user_1",hasTask,"b60443")).
+p([db,"world"],hasGraph,p("b60443",name,"123")).
+p([db,"world"],hasGraph,p("user_1",hasTask,"0cf679")).
+p([db,"world"],hasGraph,p("0cf679",name,"bv")).
+p([db,"world"],hasGraph,p("user_1",hasTask,"29f95b")).
+p([db,"world"],hasGraph,p("29f95b",name,"dsa")).
+p([db,"world"],hasGraph,p("user_1",hasTask,"d3889d")).
+p([db,"world"],hasGraph,p("d3889d",name,"ccc")).
+p([db,"world"],hasGraph,p("user_1",hasTask,"94ce59")).
+p([db,"world"],hasGraph,p("94ce59",name,"l")).

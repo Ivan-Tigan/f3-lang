@@ -30,37 +30,49 @@ const pString = ws.then(
 type Triple={s:Node,p:Node,o:Node};
 
 type Node = string | number | Node[] | { type: "graph", triples: Node[] } | Triple;
-const nestArray = <T>(arr: T[]): [T, any] | [T, T] => {
+const nestArray = <T>(arr: T[]): [T, T] | [any, T] => {
   if (arr.length === 2) return [arr[0], arr[1]];
-  const [first, ...rest] = arr;
-  return [first, nestArray(rest)];
+  const allButLast = arr.slice(0, -1);
+  const last = arr[arr.length - 1];
+  return [nestArray(allButLast), last];
 }
 
-
-// ['a', ['b', ['c', ['d', 'e']]]]
 const pLinkedList : P.Parser<Node[]> = P.string("[|").skip(ws).then(P.sepBy(P.lazy(() => pNode), ws1)).skip(ws.then(P.string("|]"))).map(nestArray);
 const pNormalList : P.Parser<Node[]> = P.string("[").skip(ws).then(P.sepBy(P.lazy(() => pNode), ws1)).skip(ws.then(P.string("]")));
 const pList : P.Parser<Node[]> = P.alt(pLinkedList, pNormalList);
-const pGraph = P.string("(").skip(ws).then(P.lazy(() => pTriples)).skip(ws.then(P.string(")"))).map(triples => ({type: "graph", triples}));
+const pGraph = P.string("(").skip(ws).then(P.lazy(() => pTriples())).skip(ws.then(P.string(")"))).map(triples => ({type: "graph", triples}));
 
 const pNode : P.Parser<Node> = P.alt(pString,  pNumber, pIdentifier, pVar, pList, pGraph, pSymbol);
-const pO : P.Parser<{o:Node}[]|{tripleTree:Triple}[]> = P.alt(
+const pO = (s?:Node) : P.Parser<{o:Node}[]|{tripleTree:Triple}[]> => P.alt(
     
-    P.string("{|").skip(ws).then(P.lazy(() => pTriples)).skip(ws.then(P.string("|}"))).map(ts => ts.flat().map(t =>({tripleTree:t}))),
-    P.string("{").skip(ws).then(P.lazy(() => pTriples)).skip(ws.then(P.string("}"))).map(ts => ts.flat().map(t =>({o:t }))),
+    P.string("{|").skip(ws).then(P.lazy(() => pTriples(s))).skip(ws.then(P.string("|}"))).map(ts => ts.flat().map(t =>({tripleTree:t}))),
+    P.string("{").skip(ws).then(P.lazy(() => pTriples())).skip(ws.then(P.string("}"))).map(ts => ts.flat().map(t =>({o:t }))),
     pNode.map(o => ([{o:o}]))
 )
 
 const uniques = <T>(arr: T[]) => [ ...new Set(arr.map(x => JSON.stringify(x))) ].map(x => JSON.parse(x) as T);
-const pOs = P.sepBy1(pO, comma).map(os => os.flat());
-const pPO = P.seqMap(pNode.skip(ws1), pOs, (p, os) => os.map(o => ({p,o})));
-const pPOs = P.sepBy1(pPO, semicolon).map(ps => ps.flat());
-const pSPO  = P.seqMap(P.lazy(() => pNode).skip(ws1), pPOs.skip(P.string(".")), (s, pos) => pos.map(({p,o}) => ({s, p, o})));
-// const pTriples = P.sepBy1(pSPO, ws).map(ts => ts.flat()).trim(ws).map(ts => ts.flatMap(t =>  "tripleTree" in t.o ? [{s:t.s,p:t.p,o:[t.s, t.o.tripleTree.s]},{s:[t.s, t.o.tripleTree.s],p:t.o.tripleTree.p,o:t.o.tripleTree.o}] : [{s:t.s,p:t.p,o:t.o.o}]));
-const pTriples = P.sepBy1(pSPO, ws).map(ts => ts.flat()).trim(ws)
-    .map(ts => ts.flatMap(t =>  "tripleTree" in t.o ? [{s:t.s,p:t.p,o:[t.s, t.o.tripleTree.s]},{s:[t.s, t.o.tripleTree.s],p:t.o.tripleTree.p,o:t.o.tripleTree.o}] : [{s:t.s,p:t.p,o:t.o.o}]))
+const pOs = (s?:Node) => P.sepBy1(pO(s), comma).map(os => os.flat());
+const pPO = (s?:Node) => P.seqMap(pNode.skip(ws1), pOs(s), (p, os) => os.map(o => ({p,o})));
+const pPOs = (s?:Node) => P.sepBy1(pPO(s), semicolon).map(ps => ps.flat());
+const pSPO  = (sPath?:Node) => 
+    P.lazy(() => pNode).skip(ws1)
+    .chain(s => 
+    {
+        const x = pPOs(sPath ? [sPath, s] : s).skip(P.string("."))
+        .map((pos) => pos.map(({p,o}) => ({s:sPath ? [sPath, s] : s, p, o})))
+        return x
+    }
+    );
+const pTriples = (s?:Node) => P.sepBy1(pSPO(s), ws).map(ts => ts.flat()).trim(ws)
+        .map(ts => ts.flatMap(t => 
+        "tripleTree" in t.o 
+            //@ts-ignore
+        ? [ {s: t.o.tripleTree.s[0], p: t.p, o: t.o.tripleTree.s}, t.o.tripleTree ]
+        : [ {s: t.s, p: t.p, o: t.o.o} ]
+    ))
     .map(uniques)
-    ;
+
+
 
 const nodeToProlog = (node: Node): string => {
   return typeof node === "string" ? (node.charAt(0).toUpperCase() !== '"' ? `${node}` : `${node}`)
@@ -118,7 +130,7 @@ const main = async () => {
         console.error("No input provided");
         Deno.exit(1);
     }
-    const result = pTriples.parse(allInput);
+    const result = pTriples().parse(allInput);
     if(result.status) { 
         const prolog = programToProlog(result.value);
         console.log(prolog);
