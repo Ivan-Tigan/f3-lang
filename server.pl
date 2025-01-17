@@ -15,7 +15,7 @@
 prolog_load_context(argv, _) :- !, fail.
 
 % Use consult instead
-:- consult('f3_assert.pl').
+% :- consult('f3_assert.pl').
 :- dynamic p/3.
 :- dynamic session_path_socket/3.
 :- http_handler('/', handle_all, [prefix]).
@@ -124,7 +124,7 @@ handle_method(post, Request) :-
     format(user_error, 'Path: ~w\n', [Path]),
     format(user_error, 'JSON: ~w\n', [JSON]),
     format(user_error, 'Guid: ~w\n', [Guid]),
-    json_to_triples(JSON, GuidJSON, JSONTriples),
+    json_to_triples(JSON, _, JSONTriples),
     % Facts to assert
     % JSONGraph = graph(JSONTriples),
     atom_string(Path, PathString),
@@ -181,7 +181,7 @@ uuid(Guid) :-
     format(atom(Id), 'post_~w', [Now]),
     b(Id, sha256, G),
     sub_string(G, 0, 6, _, Guid).
-:- initialization(main, main).
+% :- initialization(main, main).
 
 json_to_triples(Dict, Guid, Triples) :-
     % Generate a UUID for this object
@@ -236,9 +236,11 @@ safe_ws_send(Socket, Message) :-
         )
     ).
 
-main([F3File, Port]) :-
-    atom_number(Port, PortNum),
-    process_input(F3File),
+% main([F3File, Port]) :-
+start_server(PortNum) :-
+    % atom_number(Port, PortNum),
+    % process_input(F3File),
+    format(user_error, "Starting server... ~q ~n", [PortNum]),
     http_server(http_dispatch, [port(PortNum)]),
     format('Server started on port ~w~n', [PortNum]),
     thread_get_message(_).

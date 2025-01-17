@@ -1,3 +1,5 @@
+:- consult("server.pl").
+
 % :- module(f3_assert, [p/3, process_input/1]).
 :- use_module(library(crypto)).
 :- use_module(library(pcre)).
@@ -7,6 +9,7 @@
 :- multifile loaded/1.
 
 % Make p/3 dynamic so we can assert to it
+% :- table p/3.
 :- dynamic p/3.
 :- multifile p/3.
 
@@ -34,12 +37,17 @@ builtin([X, >>, Y]).
 builtin(replaceQuotes).
 builtin(lconcat).
 builtin(not).
+builtin(log).
+builtin('!=').
 
 b(A, =, B) :- A = B.
+b(A, '!=', B) :- A \= B.
 b(A, >, B) :- A > B.
 b(A, <, B) :- A < B.
 b(A, >=, B) :- A >= B.
 b(A, =<, B) :- A =< B.
+b(system, log, X) :- node_string(X, S),!, write(S), nl.
+b(system, log, X) :- write_canonical(X), nl.
 
 b(system, not, p(A,B,C)) :- \+ p(A,B,C).
 % String concatenation builtin
@@ -163,6 +171,7 @@ process_implications :-
 write_facts_and_rules(Facts, Rules) :-
    tmp_file_stream(text, File, Stream),
    format("Created temporary file: ~w~n", [File]),
+   % write(Stream, ':- table p/3.\n\n'),
    write(Stream, ':- dynamic p/3.\n\n'),
    % Write facts first
   % Then write rules
@@ -187,6 +196,8 @@ process_rule(p(graph(G1), =>, graph(G2)), Stream) :-
        format(Stream, '~q.~n', [Rule])
    )).
 
+transform_condition(p(system,cut,[]), !) :- !. 
+transform_condition(p(system,fail,[]), fail) :- !. 
 % Convert a single condition to the right form (b/3 or p/3)
 transform_condition(p(S,P,O), b(S,P,O)) :- 
    ground(P),  % Only check for builtins if P is ground
@@ -225,14 +236,17 @@ node_string(N,S) :- atom(N), atom_string(N, S), !.
 node_string(N, S) :- number(N), number_string(N, S), !.
 node_string(Triple, S) :- triple_string(Triple, TS), atomic_list_concat(['{', ' ', TS, ' ', '}'], "", S), !.
 node_string(graph(Triples), S) :- maplist(triple_string, Triples, Ss), atomic_list_concat(Ss, '\n', SG), atomic_list_concat(['(', SG, ')'], ' ', S), !.
-node_string(Ns, S) :- atomic_list_concat(Ns, ' ', C), atom_string(C, S), !.
+% node_string(Ns, S) :- term_string(Ns, S).
+%  maplist(node_string, Ns, Cs), atomic_list_concat(CS, ' ', C), atom_string(C, S), !.
+node_string(X, S) :- term_string(X, S).
+
 print_node(T) :- node_string(T, S),!, writeln(S).
 print_node(T) :- write_canonical(T), nl.
 
 % Main entry point
 % :- initialization(main).
 :-style_check(-singleton).
-main :-
+main(Args) :-
    % consult(user_input),
    [user],
      tmp_file_stream(text, File, Stream),
@@ -254,8 +268,13 @@ main :-
    % load_files(File, [dynamic(true)]).  % Use load_files with dynamic option
 
    consult(File),
+   forall((p(system, staticError, E)), (
+      ansi_format([fg(red)],"Static error: ~w~n", [E])
+      )),
+   (p(system, staticError, _) -> halt(1); true),
    % listing(p),
    % format(user_error, "~n Results 1 :~n", []),
+   (Args \= [check] ->
    forall((p(system, query, [Path, graph(G)])), (
           list_to_conjunction(G, Conjunction),
     % Collect first argument from each triple that matches the pattern
@@ -263,8 +282,13 @@ main :-
       maplist(print_node, Results)
       
       % writeln(Results)
-      ))
-
+      )),
+   forall(p(system, debug, listing), 
+      listing(p)
+      ),
+      (p(system, runWebServer, PORT) -> (writeln("Start server"), start_server(PORT)); true) 
+   ; true
+   )
    .
    % current_prolog_flag(argv, [Filename|_]),
    % process_input(Filename).
