@@ -5,6 +5,27 @@
 ![Platform](https://img.shields.io/badge/platform-linux-lightgrey)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 
+## Install
+
+Requires `snap`
+
 ``` 
 wget -qO- https://raw.githubusercontent.com/Ivan-Tigan/f3-lang/main/install.sh | sudo bash
 ```
+## Get Example
+
+this will download the ./example folder from the repository to your machine
+
+```
+wget -qO- https://api.github.com/repos/Ivan-Tigan/f3-lang/tarball | tar xz --wildcards --strip=1 "*/example"
+```
+```
+cd example
+```
+
+## Try It
+
+```
+f3 run todo.f3
+```
+
