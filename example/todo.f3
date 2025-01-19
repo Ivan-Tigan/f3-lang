@@ -4,12 +4,15 @@ html attribute class, href, id, type, name, value,
 src; 
 element a, main, header, footer, section, div, form, input, button, script, li, ul, nav.
 
+
+system include "test.f3".
+
 homePage a page; path "/users"; content homePageContent.
 homePageContent a main; child [homePageContent inner].
 [homePageContent inner] a section.
 
-HomePage get "/users"; content homePageContent.
-homePageContent a main; child {| inner a section. |}.
+// HomePage get "/users"; content homePageContent.
+// homePageContent a main; child {| inner a section. |}.
 
 
 
@@ -19,7 +22,10 @@ homePageContent a main; child {| inner a section. |}.
 //     Guid content res. res a div; class "h-10 p-2 text-green-500 "; text "Task added successfully!".
 // ).
 
-( Guid a inPost; path "/add_task"; data { X user UserId; taskName TaskName. }. Guid = TaskId.) => 
+( 
+    Guid a inPOST; path "/add_task"; data { X user UserId; taskName TaskName. }. Guid = TaskId.
+    system test "From raw prolog".
+) => 
 ( 
     [db "world"] insert { UserId hasTask TaskId. TaskId name TaskName. }.
     Guid content res. res a div; class "h-10 p-2 text-green-500 "; text "Task added successfully!".
@@ -142,5 +148,5 @@ system runWebServer 3000.
 // system query [ [A -> S P O] ( A hasChildren {S P O.}.)].
 // system query [ [A -> X] ( A hasChildren X.)].
 // system query [ [A ==> B] ( A child B.)].
-system query [ X ( res is X.)].
+// system query [ X ( res is X.)].
 // system debug listing.

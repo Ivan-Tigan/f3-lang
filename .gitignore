@@ -1,0 +1,8 @@
+# Build artifacts
+/snap/
+/f3
+/f3p
+
+.DS_Store
+*.swp
+*~

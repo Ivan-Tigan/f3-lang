@@ -13,6 +13,18 @@
 :- dynamic p/3.
 :- multifile p/3.
 
+:- multifile b/3.
+:- dynamic b/3.
+:- multifile builtin/1.
+:- dynamic builtin/1.
+:- discontiguous b/3.
+:- discontiguous builtin/1.
+
+
+:- dynamic f3_loaded/1.
+
+% :- table b/3 as subsumptive.
+
 load(DB) :-
     (loaded(DB) -> 
         true ;
@@ -46,7 +58,7 @@ b(A, >, B) :- A > B.
 b(A, <, B) :- A < B.
 b(A, >=, B) :- A >= B.
 b(A, =<, B) :- A =< B.
-b(system, log, X) :- node_string(X, S),!, write(S), nl.
+b(system, log, X) :- node_string(X, S),!, nl.
 b(system, log, X) :- write_canonical(X), nl.
 
 b(system, not, p(A,B,C)) :- \+ p(A,B,C).
@@ -243,13 +255,46 @@ node_string(X, S) :- term_string(X, S).
 print_node(T) :- node_string(T, S),!, writeln(S).
 print_node(T) :- write_canonical(T), nl.
 
+
+run_command(Command, Output) :-
+    process_create(path(sh), ['-c', Command],
+        [stdout(pipe(Out))]),
+    read_string(Out, _, Output),
+    close(Out).
+
+consult_string(S) :-
+   tmp_file_stream(text, File, Stream),
+   write(Stream, S),
+   close(Stream),
+   consult(File).
+consult_f3_file(F) :-
+   (f3_loaded(F) -> true; 
+
+   % b(["./f3p ", F], sconcat, Cmd),
+   (getenv('SNAP', Snap) -> 
+    b([Snap, "/bin/f3p ", F], sconcat, Cmd)
+;   
+    b(["./f3p ", F], sconcat, Cmd)
+),
+   run_command(Cmd, Program),
+   consult_string(Program),
+   assertz(f3_loaded(F)),
+
+   forall((p(system, include, E)), (
+      consult_f3_file(E)
+      ))
+      
+   ).
+   
+
 % Main entry point
 % :- initialization(main).
 :-style_check(-singleton).
-main(Args) :-
+main([Arg1, Arg2]) :-
    % consult(user_input),
-   [user],
-     tmp_file_stream(text, File, Stream),
+   % [user],
+   consult_f3_file(Arg2),
+   tmp_file_stream(text, File, Stream),
    % format("Created temporary file: ~w~n", [File]),
    write(Stream, ':- dynamic p/3.\n\n'),
 
@@ -268,13 +313,24 @@ main(Args) :-
    % load_files(File, [dynamic(true)]).  % Use load_files with dynamic option
 
    consult(File),
+
+   tmp_file_stream(text, File2, Stream2),
+   forall((p(system, rawProlog, E)), (
+      format(user_error, "Raw prolog: ~w~n", [E]),
+      format(Stream2, '~w~n', [E])      
+      )),
+   close(Stream2),
+   read_file_to_string(File2, Contents2, []),
+   format("Generated raw prolog:~n~w~n", [Contents2]),
+   consult(File2),
+
    forall((p(system, staticError, E)), (
       ansi_format([fg(red)],"Static error: ~w~n", [E])
       )),
    (p(system, staticError, _) -> halt(1); true),
    % listing(p),
    % format(user_error, "~n Results 1 :~n", []),
-   (Args \= [check] ->
+   (Arg1 = run ->
    forall((p(system, query, [Path, graph(G)])), (
           list_to_conjunction(G, Conjunction),
     % Collect first argument from each triple that matches the pattern

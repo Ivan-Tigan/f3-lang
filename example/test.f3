@@ -1,0 +1,3 @@
+system rawProlog "
+p(system, test, Y) :- format(user_output, \"~q~n\", [Y]).
+".

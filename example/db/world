@@ -1,0 +1,2 @@
+p([db,"world"],hasGraph,p("user_1",hasTask,"cfef18")).
+p([db,"world"],hasGraph,p("cfef18",name,"3")).
