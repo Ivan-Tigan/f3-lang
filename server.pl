@@ -38,14 +38,16 @@ handle_ws_request(Request) :-
     .
     
     handle_websocket(Request, WebSocket) :-
+        format(user_error, "handle websocket : ~w ~w ~n~n", [Request, WebSocket]),
         session_id_cookie(Request, SessionIdCookie),
         member(path(PathAtom), Request),
         atom_string(PathAtom, Path),
         asserta(session_path_socket(SessionIdCookie, Path, WebSocket)),
-        
+        format(user_error, "WS ~q ~q ~n", [PathAtom, Path]), 
         % Send initial content
         (   (p(res, is, [Path, ->, Content]);
             atom_string(TempPathAtom, Path),
+            format(user_error, "WS content Path: ~w ~w ~n ~w ~n", [Path, TempPathAtom, Content]),
             p(res, is, [TempPathAtom, ->, Content]))
         ->  ws_send(WebSocket, text(Content))
         ;   true
@@ -102,11 +104,20 @@ handle_method(get, Request) :-
     %        format(user_error, "Found fact: p(~q, ~q, ~q)~n", [X, Y, Z])),
     % forall(p(res, is, [P, ->, C]) , 
     %        format(user_error, "Found page: p(~w, ->, ~w)~n", [P, C])),
+    (memberchk(cookie(Cookies), Request),
+     memberchk('connect.sid'=_, Cookies) ->
+        % Cookie exists, don't set a new one
+        true
+    ;   % No cookie, generate and set new session
+        uuid(SessionId),
+        format('Set-Cookie: connect.sid=~w; Path=/; HttpOnly~n', [SessionId])
+    ),
 
     (   (p(res, is, [PathString, ->, Content]);
         atom_string(PathAtom, PathString),
         p(res, is, [PathAtom, ->, Content]))
-    ->  format(user_error, "Found content for ~w~n", [Path]),
+    ->  format(user_error, "Found content for ~w ~n ~w ~n", [Path, Content]),
+    
         format('Content-type: text/html~n~n'),
         write(Content)
     ;   format(user_error, "No content found for ~w~n", [Path]),

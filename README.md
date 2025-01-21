@@ -5,9 +5,13 @@
 ![Platform](https://img.shields.io/badge/platform-linux-lightgrey)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 
+A simple, powerful, extensible logic programming language based on triples.
+
+
+
 ## Install
 
-Requires `snap`
+Requires `docker`
 
 ``` 
 wget -qO- https://raw.githubusercontent.com/Ivan-Tigan/f3-lang/main/install.sh | sudo bash
@@ -26,6 +30,6 @@ cd example
 ## Try It
 
 ```
-f3 run todo.f3
+f3 -p 3000:3000 run todo.f3
 ```
 

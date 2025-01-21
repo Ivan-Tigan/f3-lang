@@ -2,7 +2,8 @@
 /snap/
 /f3
 /f3p
-
+f3
+/example/db/
 .DS_Store
 *.swp
 *~
