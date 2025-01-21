@@ -28,6 +28,7 @@ RUN mkdir /data
 
 # Set environment variables
 ENV PATH="/app:${PATH}"
+ENV F3_HOME=/app
 
 # Set working directory to /data where users will mount their files
 WORKDIR /data

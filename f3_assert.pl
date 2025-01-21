@@ -270,22 +270,22 @@ consult_string(S) :-
 consult_f3_file(F) :-
    (f3_loaded(F) -> true; 
 
-   % b(["./f3p ", F], sconcat, Cmd),
-   (getenv('SNAP', Snap) -> 
-    b([Snap, "/bin/f3p ", F], sconcat, Cmd)
-;   
-    b(["./f3p ", F], sconcat, Cmd)
-),
+   % Try F3_HOME env first, then SNAP, then fallback to local
+   (getenv('F3_HOME', Home) -> 
+      b([Home, "/f3p ", F], sconcat, Cmd)
+   ; getenv('SNAP', Snap) -> 
+      b([Snap, "/bin/f3p ", F], sconcat, Cmd)
+   ;   
+      b(["./f3p ", F], sconcat, Cmd)
+   ),
    run_command(Cmd, Program),
    consult_string(Program),
    assertz(f3_loaded(F)),
 
    forall((p(system, include, E)), (
       consult_f3_file(E)
-      ))
-      
-   ).
-   
+   ))
+).
 
 % Main entry point
 % :- initialization(main).

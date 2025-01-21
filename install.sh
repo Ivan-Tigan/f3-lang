@@ -42,8 +42,8 @@ fi
 # Get current directory for volume mounting
 CURRENT_DIR=$(pwd)
 
-# Run the docker command with all arguments
-docker run -v "$CURRENT_DIR:/data" $PORT_MAP $DOCKER_IMAGE f3 "$@"
+# Run the docker command with all arguments, adding --rm flag
+docker run --rm -v "$CURRENT_DIR:/data" $PORT_MAP $DOCKER_IMAGE f3 "$@"
 EOF
 
 # Make script executable
