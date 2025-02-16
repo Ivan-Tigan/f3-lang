@@ -21,20 +21,39 @@ homePageContent a main; child [homePageContent inner].
 //     [db "world"] insert { UserId hasTask TaskId. TaskId name TaskName. }.
 //     Guid content res. res a div; class "h-10 p-2 text-green-500 "; text "Task added successfully!".
 // ).
+(
+    (Rq url "https://jsonplaceholder.typicode.com/posts"; 
+        params (userId = 1.); 
+        config (timeout = 30. maxRedirects = 5.).
+    ) [httpGET >> iter >> match] 
+        (id = Id. title = Title. body = Body.).
+    
+) => (
+    http test [get ID Title Body].
+).
+
+(
+    (Rq url "https://jsonplaceholder.typicode.com/posts"; 
+        body ( userId = 1. id = 879. title = "foo". body = "bar".);
+        headers ("Content-Type" = "application/json".).
+    ) httpPOST Res.
+) => (
+    http test [post Res].
+).
 
 ( 
-    Guid a inPOST; path "/add_task"; data { X user UserId; taskName TaskName. }. Guid = TaskId.
+    Guid a inPOST; path "/add_task"; [data >> match] ( user = UserId. taskName = TaskName. ). Guid = TaskId.
     system test "From raw prolog".
 ) => 
 ( 
     [db "world"] insert { UserId hasTask TaskId. TaskId name TaskName. }.
     Guid content res. res a div; class "h-10 p-2 text-green-500 "; text "Task added successfully!".
 ).
-( Guid a inPOST; path "/delete_task"; data { X task TaskId. }. ) => 
+( Guid a inPOST; path "/delete_task"; data ( task = TaskId. ). ) => 
 ( [db "world"] delete { Uid hasTask TaskId. TaskId P O. }. ).
 
 
-( Guid a inPOST; path "/set_task_name"; data { X task TaskId; newName NewName. }.  ) => 
+( Guid a inPOST; path "/set_task_name"; [data >> match] ( task = TaskId. newName = NewName. ).  ) => 
 ( [db "world"] delete { TaskId name OldName. }; insert { TaskId name NewName.}. ).
 
 [db "world"] hasGraph {

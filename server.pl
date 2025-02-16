@@ -126,7 +126,8 @@ handle_method(get, Request) :-
 
 handle_method(post, Request) :-
     memberchk(path(Path), Request),
-    http_read_json(Request, json(JSON), []),
+    http_read_json(Request, JSON, [json_object(dict)
+    ]),
     % http_read_data(Request, JSON),
     
     uuid(Guid),
@@ -135,18 +136,18 @@ handle_method(post, Request) :-
     format(user_error, 'Path: ~w\n', [Path]),
     format(user_error, 'JSON: ~w\n', [JSON]),
     format(user_error, 'Guid: ~w\n', [Guid]),
-    json_to_triples(JSON, _, JSONTriples),
+    json_to_triples(JSON, JSONTriples),
     % Facts to assert
     % JSONGraph = graph(JSONTriples),
     atom_string(Path, PathString),
     BaseFacts = [
         p(Guid, a, inPOST),
-        p(Guid, path, PathString)
-        % p(Guid, data, JSONGraph)
+        p(Guid, path, PathString),
+        p(Guid, data, JSONTriples)
     ],
-    wrap_triples(Guid, data, JSONTriples, WrappedJSONFacts),
-    append(BaseFacts, WrappedJSONFacts, Facts),
-
+    % wrap_triples(Guid, data, JSONTriples, WrappedJSONFacts),
+    % append(BaseFacts, WrappedJSONFacts, Facts),
+    Facts = BaseFacts,
     format(user_error, "Facts to assert: ~q ~n", [Facts]),
     % b(JSONGraph, query, graph([ p(U, user, Name), p(U, taskName, T)])),
     % format(user_error, "Query facts ~q ~q ~q:~n", [U, Name, T]),
@@ -194,37 +195,60 @@ uuid(Guid) :-
     sub_string(G, 0, 6, _, Guid).
 % :- initialization(main, main).
 
-json_to_triples(Dict, Guid, Triples) :-
-    % Generate a UUID for this object
-    uuid(Guid),
-    % Convert each key-value pair to triples
+
+% Main predicate to convert JSON/dict to triples
+json_to_triples(Dict, graph(Triples)) :-
     dict_pairs(Dict, _Type, Pairs),
-    maplist(pair_to_triples(Guid), Pairs, TripleLists),
-    append(TripleLists, Triples).
+    maplist(pair_to_triples, Pairs, TripleLists),
+    flatten(TripleLists, Triples).
+
+% Handle different types of values in key-value pairs
+pair_to_triples(Key-Value, [p(Key, =, ProcessedValue)]) :-
+    process_value(Value, ProcessedValue).
+
+% Process atomic values (numbers, strings, etc.)
+process_value(Value, Value) :-
+    atomic(Value).
+
+% Process nested dictionaries
+process_value(Dict, graph(NestedTriples)) :-
+    is_dict(Dict),
+    json_to_triples(Dict, graph(NestedTriples)).
+
+% Process lists
+process_value(List, ProcessedList) :-
+    is_list(List),
+    maplist(process_list_item, List, ProcessedList).
+
+% Process items in a list
+process_list_item(Item, ProcessedItem) :-
+    process_value(Item, ProcessedItem).
+
 % Handle nested objects
-pair_to_triples(ParentGuid, Key-Value, [p(ParentGuid, Key, ChildGuid)|ChildTriples]) :-
-    is_dict(Value),
-    !,
-    json_to_triples(Value, ChildGuid, ChildTriples).
+% pair_to_triples(ParentGuid, Key-Value, [p(ParentGuid, Key, ChildGuid)|ChildTriples]) :-
+%     is_dict(Value),
+%     !,
+%     json_to_triples(Value, ChildGuid, ChildTriples).
 
-% Handle arrays
-pair_to_triples(ParentGuid, Key-Value, [p(ParentGuid, Key, Value)]) :-
-    is_list(Value),
-    !.
+% % Handle arrays
+% pair_to_triples(ParentGuid, Key-Value, [p(ParentGuid, Key, Value)]) :-
+%     is_list(Value),
+%     !.
 
-% Handle string values - convert to string type
-pair_to_triples(ParentGuid, Key-Value, [p(ParentGuid, Key, String)]) :-
-    atom(Value),
-    !,
-    atom_string(Value, String).
+% % Handle string values - convert to string type
+% pair_to_triples(ParentGuid, Key-Value, [p(ParentGuid, Key, String)]) :-
+%     atom(Value),
+%     !,
+%     atom_string(Value, String).
 
-% Handle numeric values - keep as is
-pair_to_triples(ParentGuid, Key-Value, [p(ParentGuid, Key, Value)]) :-
-    number(Value),
-    !.
+% % Handle numeric values - keep as is
+% pair_to_triples(ParentGuid, Key-Value, [p(ParentGuid, Key, Value)]) :-
+%     number(Value),
+%     !.
 
-% Handle other simple values
-pair_to_triples(ParentGuid, Key-Value, [p(ParentGuid, Key, Value)]).
+% % Handle other simple values
+% pair_to_triples(ParentGuid, Key-Value, [p(ParentGuid, Key, Value)]).
+
 % Handle nested objects
 wrap_triples(_,_, [], []).
 wrap_triples(S, P, [H|T], [p(S, P, H)|Rest]) :-

@@ -3,7 +3,9 @@
 % :- module(f3_assert, [p/3, process_input/1]).
 :- use_module(library(crypto)).
 :- use_module(library(pcre)).
-
+:- use_module(builtins/cache).
+:- use_module(builtins/http).
+:- use_module(builtins/match).
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
 :- multifile loaded/1.
@@ -13,9 +15,9 @@
 :- dynamic p/3.
 :- multifile p/3.
 
-:- multifile b/3.
+:- multifile user:b/3.
 :- dynamic b/3.
-:- multifile builtin/1.
+:- multifile user:builtin/1.
 :- dynamic builtin/1.
 :- discontiguous b/3.
 :- discontiguous builtin/1.
@@ -41,7 +43,6 @@ builtin(>=).
 builtin(<=).
 builtin(sconcat).
 builtin(collect).
-builtin(query).
 builtin(sha256). 
 builtin([Index]) :- number(Index), !.
 builtin(hasGraph).
@@ -51,6 +52,7 @@ builtin(lconcat).
 builtin(not).
 builtin(log).
 builtin('!=').
+builtin(iter).
 
 b(A, =, B) :- A = B.
 b(A, '!=', B) :- A \= B.
@@ -60,6 +62,11 @@ b(A, >=, B) :- A >= B.
 b(A, =<, B) :- A =< B.
 b(system, log, X) :- node_string(X, S),!, nl.
 b(system, log, X) :- write_canonical(X), nl.
+
+% Iter builtin to match each element of a list
+b(List, iter, Element) :- 
+    is_list(List),
+    member(Element, List).
 
 b(system, not, p(A,B,C)) :- \+ p(A,B,C).
 % String concatenation builtin
@@ -86,12 +93,8 @@ b(A, [X, >>, Y], B) :- builtin(X), !, b(A, X, C), p(C, Y, B) .
 b(A, [X, >>, Y], B) :- builtin(Y), !, p(A, X, C), b(C, Y, B) .
 b(A, [X, >>, Y], B) :- p(A, X, C), p(C, Y, B) .
 
-b(graph(G1s), query, graph(G2s)) :-
-   % writeln('Query:'),
-   % writeln(G2s),
-   % writeln('Against:'),
-   % writeln(G1s),
-   query_match(G2s, G1s).
+
+
 % b(Input, sha256, Hash) :-
 %     atomic(Input),
 %     crypto_data_hash(Input, Hash, [algorithm(sha256), encoding(hex)]).
@@ -111,12 +114,7 @@ replace_substring(String, To_Replace, Replace_With, Result) :-
     ).
 
 
-query_match([], _).
-query_match([p(S,P,O)|Rest], Source) :-
-   % writeln('Matching:'),
-   % writeln(p(S,P,O)),
-   member(p(S,P,O), Source),
-   query_match(Rest, Source).
+
 full_db_path(DBPath, FullPath) :-
     atom_concat('db/', DBPath, FullPath).
 insert_db_fact(p([db, DBPath], hasGraph, P)) :-
@@ -247,10 +245,39 @@ node_string(N, S) :- string(N), atomic_list_concat(['"', N, '"'], '', S),!.
 node_string(N,S) :- atom(N), atom_string(N, S), !.
 node_string(N, S) :- number(N), number_string(N, S), !.
 node_string(Triple, S) :- triple_string(Triple, TS), atomic_list_concat(['{', ' ', TS, ' ', '}'], "", S), !.
-node_string(graph(Triples), S) :- maplist(triple_string, Triples, Ss), atomic_list_concat(Ss, '\n', SG), atomic_list_concat(['(', SG, ')'], ' ', S), !.
+% node_string(graph(Triples), S) :- maplist(triple_string, Triples, Ss), atomic_list_concat(Ss, '\n', SG), atomic_list_concat(['(', SG, ')'], ' ', S), !.
+node_string(graph([]), S) :-
+    atomic_list_concat(['(\n\n)'], '', S), !.
+
+node_string(graph([Triple]), S) :- 
+    % Single triple without nested graphs
+    triple_string(Triple, TS),
+    \+ sub_term(graph(_), Triple),
+    atomic_list_concat(['(', TS, ')'], ' ', S), !.
+
+node_string(graph(Triples), S) :- 
+    maplist(triple_string, Triples, RawSs),
+    maplist(add_double_indent, RawSs, Ss),
+    atomic_list_concat(Ss, '\n', SG),
+    atomic_list_concat(['(\n', SG, '\n)'], '', S), !.
+
+
+node_string(XS, S) :- 
+    is_list(XS),
+    maplist(node_string, XS, SS),
+    atomic_list_concat(SS, ' ', Inner),
+    atomic_list_concat(['[', Inner, ']'], ' ', S), !.
 % node_string(Ns, S) :- term_string(Ns, S).
 %  maplist(node_string, Ns, Cs), atomic_list_concat(CS, ' ', C), atom_string(C, S), !.
 node_string(X, S) :- term_string(X, S).
+
+add_double_indent(Line, Indented) :-
+    atomic_list_concat(['  ', Line], '', Indented).
+
+
+% Helper predicate to add indentation
+add_indent(Line, Indented) :-
+    atomic_list_concat(['  ', Line], '', Indented).
 
 print_node(T) :- node_string(T, S),!, writeln(S).
 print_node(T) :- write_canonical(T), nl.

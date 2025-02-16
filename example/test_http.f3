@@ -1,0 +1,29 @@
+(
+    (
+        1 a post;
+        url "https://httpbin.org/post";
+        params (param1 = 1. param2 = 3.);
+        body (
+            user = (
+                name = "John".
+                age = 30.
+                address = (street = "123 Main St". city = "New York".).
+            ).
+            settings = (
+                enabled = true.
+                theme = "dark".
+            ).
+        );
+        headers (
+            "Content-Type" = "application/json".
+            "X-Custom-Header" = "test-value".
+        ).
+    ) [fetch >> match] (response body (json = Res.).).
+) => (
+    ress is Res.
+).
+( [ 1/2 1/2 ] sum R.)
+=> (res is R.).
+res is [3.4 1/2].
+
+system query [[X] ( res is X.)].

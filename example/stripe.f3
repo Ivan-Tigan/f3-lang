@@ -1,0 +1,8 @@
+"sub_1" a subscription;
+    interval monthly;
+    name "Subscription 1";
+    price [1000 eur], [2000 bgn]. 
+"credits_1" a currency;
+    name "Credits 1";
+    price [1 usd];
+    minBuy 500.
