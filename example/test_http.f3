@@ -19,9 +19,8 @@
             "X-Custom-Header" = "test-value".
         ).
     ) [fetch >> match] (response body (json = Res.).).
-) => (
-    ress is Res.
-).
+) => ( ress is Res.).
+
 ( [ 1/2 1/2 ] sum R.)
 => (res is R.).
 res is [3.4 1/2].

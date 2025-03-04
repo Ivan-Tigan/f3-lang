@@ -1,6 +1,5 @@
 :- module(server, [start_server/1]).
 
-:- [f3_websocket].
 :- use_module(library(http/thread_httpd)).
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_error)).
@@ -25,15 +24,6 @@ handle_request(Request) :-
     
     % Extract HTTP method
     memberchk(method(Method), Request),
-    
-    % CHECK FOR WEBSOCKET - ADD THESE LINES
-    (   f3_websocket:is_websocket_request(Request),
-        f3_websocket:handle_websocket_upgrade(Request, _)
-    ->  % WebSocket handling complete, stop processing
-        !  % Cut to prevent falling through to HTTP handling
-    ;   % Not a WebSocket, continue with normal HTTP processing
-        true
-    ),
     
     % Special handling for POST/PUT with JSON
     (  (Method == post ; Method == put),
