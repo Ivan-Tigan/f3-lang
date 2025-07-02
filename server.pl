@@ -35,27 +35,31 @@ handle_request(Request) :-
         true
     ),
     
-    % Special handling for POST/PUT with JSON
+    % Special handling for POST/PUT with body content
     (  (Method == post ; Method == put),
-       memberchk(content_type(ContentType), Request),
-       (ContentType == application/json ; sub_atom(ContentType, 0, _, _, 'application/json'))
-    -> read_json_request(Request, JSONDict),
-       format(user_error, "Parsed JSON body: ~w~n", [JSONDict]),
+       memberchk(content_type(ContentType), Request)
+    -> (  (ContentType == application/json ; sub_atom(ContentType, 0, _, _, 'application/json'))
+       -> read_json_request(Request, JSONDict),
+          format(user_error, "Parsed JSON body: ~w~n", [JSONDict]),
+          json_body_to_triples(JSONDict, BodyTriples)
+       ;  (ContentType == 'application/x-www-form-urlencoded' ; sub_atom(ContentType, 0, _, _, 'application/x-www-form-urlencoded'))
+       -> read_form_request(Request, FormData),
+          format(user_error, "Parsed form body: ~w~n", [FormData]),
+          form_data_to_triples(FormData, BodyTriples)
+       ;  format(user_error, "Unsupported content type: ~w~n", [ContentType]),
+          BodyTriples = []
+       ),
        
-       % Convert JSON body to triples
-       json_body_to_triples(JSONDict, BodyTriples),
-       
-       % Build the triple pattern with JSON body
+       % Build the triple pattern with body
        generate_request_id(RequestId),
        atom_string(PathAtom, Path),
        method_to_request_type(Method, RequestType),
-       % Build request pattern with body
        Pattern = graph([
            p(RequestId, a, RequestType),
            p(RequestId, path, Path),
            p(RequestId, body, graph(BodyTriples))
        ])
-    ;  % Regular request without JSON body
+    ;  % Regular request without body
        request_to_triple_pattern(Request, Pattern)
     ),
     
@@ -96,6 +100,44 @@ read_json_request(Request, JSONDict) :-
 json_body_to_triples(JSONDict, Triples) :-
     dict_pairs(JSONDict, _, Pairs),
     maplist(json_pair_to_triple, Pairs, Triples).
+
+% Read form data from request
+read_form_request(Request, FormData) :-
+    % Get the content length
+    memberchk(content_length(ContentLength), Request),
+    format(user_error, "Form content length: ~w~n", [ContentLength]),
+    
+    % Get the input stream
+    memberchk(input(InStream), Request),
+    
+    % Read raw form data
+    read_string(InStream, ContentLength, RawForm),
+    format(user_error, "Raw form data: ~w~n", [RawForm]),
+    
+    % Parse the form data
+    catch(
+        parse_form_data(RawForm, FormData),
+        Error,
+        (format(user_error, "Form parse error: ~w~n", [Error]), FormData = [])
+    ).
+
+% Parse URL-encoded form data
+parse_form_data(RawForm, FormData) :-
+    split_string(RawForm, '&', '', Pairs),
+    maplist(parse_form_pair, Pairs, FormData).
+
+% Parse individual form field
+parse_form_pair(Pair, Name=Value) :-
+    split_string(Pair, '=', '', [NameEncoded, ValueEncoded]),
+    uri_encoded(query_value, Name, NameEncoded),
+    uri_encoded(query_value, Value, ValueEncoded).
+
+% Convert form data to triples format
+form_data_to_triples(FormData, Triples) :-
+    maplist(form_pair_to_triple, FormData, Triples).
+
+% Convert a form field to a triple
+form_pair_to_triple(Name=Value, p(Name, =, Value)).
 
 % Convert a JSON key-value pair to a triple
 json_pair_to_triple(Key-Value, p(Key, =, ProcessedValue)) :-
