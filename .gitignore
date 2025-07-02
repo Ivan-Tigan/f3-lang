@@ -7,3 +7,5 @@ f3
 .DS_Store
 *.swp
 *~
+data.mdb
+lock.mdb

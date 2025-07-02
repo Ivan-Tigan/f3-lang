@@ -121,6 +121,41 @@ test(complex_graph_traversal) :-
     
     b(lmdb, end, ReadTxn).
 
+test(f3_style_rule_with_findall) :-
+    % Define a rule similar to what F3 generates
+    assertz((result_inserted(ok) :-
+        b(lmdb, readWriteStart, Txn),
+        b(Txn, lmdbInsert, p(alice, likes, programming)),
+        b(lmdb, end, Txn)
+    )),
+    
+    % Use findall like F3's system query does
+    findall(X, result_inserted(X), Results),
+    member(ok, Results),
+    
+    % Clean up
+    retract((result_inserted(_) :- _)).
+
+test(f3_style_query_rule_with_findall) :-
+    % First insert some data
+    b(lmdb, readWriteStart, WriteTxn),
+    b(WriteTxn, lmdbInsert, p(alice, likes, programming)),
+    b(lmdb, end, WriteTxn),
+    
+    % Define a rule that queries (like F3 generates)
+    assertz((result_found(X) :-
+        b(lmdb, readStart, ReadTxn),
+        b(ReadTxn, lmdbQuery, p(alice, likes, X)),
+        b(lmdb, end, ReadTxn)
+    )),
+    
+    % Use findall to query it
+    findall(X, result_found(X), Results),
+    member(programming, Results),
+    
+    % Clean up
+    retract((result_found(_) :- _)).
+
 :- end_tests(lmdb_builtins).
 
 % Run tests

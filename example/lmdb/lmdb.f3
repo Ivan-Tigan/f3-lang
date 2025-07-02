@@ -22,4 +22,4 @@
 
 system query [ X ( result inserted X. ) ].
 
-// system query [ X ( result found X. ) ].
+system query [ X ( result found X. ) ].

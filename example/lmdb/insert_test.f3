@@ -1,0 +1,13 @@
+// Simple LMDB test - insert only
+(
+    lmdb readWriteStart WriteTxn.
+    WriteTxn lmdbInsert {
+        alice likes bob.
+    }.
+    // WriteTxn lmdbQuery { A likes B. }.
+    lmdb end WriteTxn.
+) => (
+    result inserted ok.
+).
+system debug listing.
+system query [ X ( result inserted X. ) ].
