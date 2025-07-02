@@ -175,7 +175,7 @@ send_http_response(graph(ResponseTriples)) :-
         format(user_error, "Default status: 200~n", [])
     ),
     
-    % Extract headers with safe parsing - now properly handling strings!
+    % Extract headers with safe parsing
     format(user_error, "Extracting headers~n", []),
     findall(HeaderName-HeaderValue,
             (member(p(_, headers, graph(HeaderTriples)), ResponseTriples),
@@ -183,29 +183,22 @@ send_http_response(graph(ResponseTriples)) :-
              format(user_error, "Found header: ~q = ~q~n", [HeaderName, HeaderValue])
             ),
             HeaderPairs),
-    format(user_error, "Header pairs: ~q~n", [HeaderPairs]),  % ~q shows quotes
+    format(user_error, "Header pairs: ~q~n", [HeaderPairs]),
     
-    % Extract body content
+    % Extract body content - expect direct string
     memberchk(p(_, body, BodyContent), ResponseTriples),
     
-    % Determine content type - now looking for string "Content-Type" not atom 'Content-Type'
-    format(user_error, "Finding content type in: ~q~n", [HeaderPairs]),  % ~q shows quotes
+    % Determine content type
+    format(user_error, "Finding content type in: ~q~n", [HeaderPairs]),
     (   member("Content-Type"-ContentType, HeaderPairs)
-    ->  format(user_error, "Content type from headers: ~q~n", [ContentType])  % ~q shows quotes
+    ->  format(user_error, "Content type from headers: ~q~n", [ContentType])
     ;   ContentType = "text/html; charset=utf-8",
         format(user_error, "Using default content type~n", [])
     ),
     
-    % Process body based on content type - check for string "application/json"
-    format(user_error, "Processing body as: ~q~n", [ContentType]),  % ~q shows quotes
-    (   ContentType = "application/json"
-    ->  % JSON response
-        format(user_error, "Generating JSON response~n", []),
-        generate_json_response(BodyContent, ProcessedBody)
-    ;   % HTML response
-        format(user_error, "Generating HTML response~n", []),
-        generate_html_response(BodyContent, ProcessedBody)
-    ),
+    % Use body content directly as string
+    format(user_error, "Using body content directly as string~n", []),
+    ProcessedBody = BodyContent,
     
     % Send response headers
     format('Status: ~w~n', [Status]),
