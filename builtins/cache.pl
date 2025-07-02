@@ -4,6 +4,9 @@
 ]).
 
 :- dynamic cache/4.  % cache(Args, Operation, Result, LRUTimestamp)
+:- multifile user:b/3.
+:- multifile user:builtin/1.
+:- multifile user:p/3.
 
 write_cache(Args, Operation, Result) :-
     get_time(Now),
@@ -32,3 +35,15 @@ clear_cache :-
 % b(A, [cache, P], B) :- access_cache(A, [cache, P], B), !.
 % b(A, [cache, P], B) :- p(A, P, B), !, write_cache(A, [cache, P], B).
 % b(A, [cache, P], B) :- b(A, P, C), !, write_cache(A, [cache, P], C).
+
+
+user:b(A, [Key, cache, P], B) :-
+    access_cache(A, [Key, cache, P], B), !.
+user:b(A, [Key, cache, P], B) :-
+    user:p(A, P, B), !,
+    write_cache(A, [Key, cache, P], B).
+user:b(A, [Key, cache, P], B) :-
+    user:b(A, P, C), !,
+    write_cache(A, [Key, cache, P], C).
+
+user:builtin([Key, cache, P]).

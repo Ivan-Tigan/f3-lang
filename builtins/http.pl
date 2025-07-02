@@ -54,8 +54,6 @@ json_field_to_graph(Name=Value, p(Name,=,Value)).
 user:builtin(fetch).
 % Main predicate to handle HTTP requests with caching
 user:b(Request, fetch, Response) :-
-    access_cache(Request, fetch, Response), !.
-user:b(Request, fetch, Response) :-
     % Extract components from Request
     Request = graph(RequestProps),
     memberchk(p(_, url, BaseURL), RequestProps),
@@ -88,10 +86,8 @@ user:b(Request, fetch, Response) :-
     Response = graph([
         p(response, headers, graph([p(content_type,=,'application/json')])),
         p(response, body, ResponseBody)
-    ]),
+    ]).
     
-    % Write to cache
-    write_cache(Request, fetch, Response).
 
 % Tests
 :- begin_tests(http_client).

@@ -6,6 +6,7 @@
 :- use_module(builtins/cache).
 :- use_module(builtins/http).
 :- use_module(builtins/match).
+:- use_module(builtins/lmdb).
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
 :- multifile loaded/1.
