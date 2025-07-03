@@ -34,7 +34,7 @@ handle_request(Request) :-
     ;   % Not a WebSocket, continue with normal HTTP processing
         true
     ),
-    
+        format(user_error, "XXX before post/put handling : ~w ~w ~n", [Path, Method]),
     % Special handling for POST/PUT with body content
     (  (Method == post ; Method == put),
        memberchk(content_type(ContentType), Request)
@@ -52,6 +52,7 @@ handle_request(Request) :-
        
        % Build the triple pattern with body
        generate_request_id(RequestId),
+          format(user_error, "Generated request id: ~w~n", [RequestId]),
        atom_string(PathAtom, Path),
        method_to_request_type(Method, RequestType),
        Pattern = graph([
@@ -176,8 +177,27 @@ request_to_triple_pattern(Request, TriplePattern) :-
     (   memberchk(search(Search), Request),
         Search \= []
     ->  search_params_to_triples(Search, ParamTriples),
-        AllTriples = [p(RequestId, params, graph(ParamTriples))|BaseTriples]
-    ;   AllTriples = BaseTriples
+        TriplesWithParams = [p(RequestId, params, graph(ParamTriples))|BaseTriples]
+    ;   TriplesWithParams = BaseTriples
+    ),
+    
+    % Extract cookies if present
+    (   memberchk(cookie(Cookies), Request)
+    ->  maplist(cookie_to_triple, Cookies, CookieTriples),
+        TriplesWithCookies = [p(RequestId, cookies, graph(CookieTriples))|TriplesWithParams]
+    ;   TriplesWithCookies = TriplesWithParams
+    ),
+    
+    % Extract other headers if needed
+    findall(p(HeaderName, =, HeaderValue), 
+            (member(HeaderTerm, Request),
+             HeaderTerm =.. [HeaderName, HeaderValue],
+             \+ member(HeaderName, [path_info, protocol, peer, pool, input, method, request_uri, path, http_version, cookie])
+            ), 
+            HeaderTriples),
+    (   HeaderTriples \= []
+    ->  AllTriples = [p(RequestId, headers, graph(HeaderTriples))|TriplesWithCookies]
+    ;   AllTriples = TriplesWithCookies
     ),
     
     % Construct the final triple pattern
@@ -192,8 +212,13 @@ method_to_request_type(_, request).
 
 % Convert search parameters to triples
 search_params_to_triples([], []).
-search_params_to_triples([Name=Value|Rest], [p(Name, =, Value)|RestTriples]) :-
+search_params_to_triples([Name=Value|Rest], [p(Name, =, ValueString)|RestTriples]) :-
+    atom_string(Value, ValueString),
     search_params_to_triples(Rest, RestTriples).
+
+% Convert cookie to triple (convert values to strings for easier F3 matching)
+cookie_to_triple(Name=Value, p(Name, =, ValueString)) :-
+    atom_string(Value, ValueString).
 
 % Match request pattern against defined rules
 match_request_pattern(RequestPattern, Response) :-
@@ -227,8 +252,11 @@ send_http_response(graph(ResponseTriples)) :-
             HeaderPairs),
     format(user_error, "Header pairs: ~q~n", [HeaderPairs]),
     
-    % Extract body content - expect direct string
-    memberchk(p(_, body, BodyContent), ResponseTriples),
+    % Extract body content - optional, default to empty string
+    (   memberchk(p(_, body, BodyContent), ResponseTriples)
+    ->  true
+    ;   BodyContent = ""
+    ),
     
     % Determine content type
     format(user_error, "Finding content type in: ~q~n", [HeaderPairs]),
@@ -258,27 +286,6 @@ send_http_response(graph(ResponseTriples)) :-
     write(ProcessedBody),
     format(user_error, "Response complete~n", []).
 
-% Generate JSON response from triples
-generate_json_response(graph(Triples), JSONString) :-
-    format(user_error, "Converting triples to JSON dict~n", []),
-    
-    % Extract key-value pairs
-    findall(Key-Value, member(p(Key, =, Value), Triples), Pairs),
-    format(user_error, "Extracted key-value pairs: ~q~n", [Pairs]),  % ~q shows quotes
-    
-    % Process nested values
-    process_json_pairs(Pairs, ProcessedPairs),
-    format(user_error, "Processed pairs: ~q~n", [ProcessedPairs]),  % ~q shows quotes
-    
-    % Create JSON dict
-    dict_pairs(JSON, json, ProcessedPairs),
-    format(user_error, "Created JSON dict: ~w~n", [JSON]),
-    
-    % Write to string
-    with_output_to(string(JSONString), 
-                   json_write(current_output, JSON, [width(0)])),
-    format(user_error, "Generated JSON string (length: ~w)~n", [string_length(JSONString, _)]).
-
 % Process JSON value for output
 process_json_pairs([], []).
 process_json_pairs([Key-graph(Triples)|Rest], [Key-NestedJSON|ProcessedRest]) :-
@@ -292,71 +299,11 @@ process_json_pairs([Key-Value|Rest], [Key-Value|ProcessedRest]) :-
     % Handle direct values
     process_json_pairs(Rest, ProcessedRest).
 
-% Generate HTML response from triples
-generate_html_response(graph(Triples), HTML) :-
-    % Find root elements
-    findall(Root, (
-        member(p(Root, a, _), Triples),
-        \+ member(p(_, child, Root), Triples)
-    ), RootElements),
-    format(user_error, "HTML root elements: ~w~n", [RootElements]),
-    
-    % Generate HTML for each root element
-    maplist(element_to_html(Triples), RootElements, ElementHTMLs),
-    
-    % Combine all HTML
-    atomic_list_concat(ElementHTMLs, '\n', HTML),
-    format(user_error, "Generated HTML (length: ~w)~n", [string_length(HTML, _)]).
-generate_html_response(Text, Text) :-
-    (string(Text) ; atom(Text)),
-    format(user_error, "Direct text content (length: ~w)~n", [string_length(Text, _)]).
-
-% Convert an element to HTML string
-element_to_html(Triples, Element, HTML) :-
-    % Get element type
-    memberchk(p(Element, a, ElementType), Triples),
-    
-    % Get element attributes
-    findall(Attr-Value, (
-        member(p(Element, Attr, Value), Triples),
-        Attr \= a,
-        Attr \= child,
-        Attr \= text
-    ), Attributes),
-    
-    % Format attributes
-    format_attributes(Attributes, AttributesStr),
-    
-    % Get content (text or children)
-    (   memberchk(p(Element, text, Text), Triples)
-    ->  Content = Text
-    ;   findall(Child, member(p(Element, child, Child), Triples), Children),
-        maplist(element_to_html(Triples), Children, ChildrenHTML),
-        atomic_list_concat(ChildrenHTML, '', Content)
-    ),
-    
-    % Format HTML tag
-    format(string(HTML), '<~w~w>~w</~w>', [ElementType, AttributesStr, Content, ElementType]).
-
-% Format attributes for HTML
-format_attributes([], '').
-format_attributes(Attributes, AttributesStr) :-
-    maplist(format_attribute, Attributes, AttrStrings),
-    atomic_list_concat(AttrStrings, ' ', AttrStr),
-    (   AttrStr = ''
-    ->  AttributesStr = ''
-    ;   format(string(AttributesStr), ' ~w', [AttrStr])
-    ).
-
-format_attribute(Name-Value, AttributeStr) :-
-    format(string(AttributeStr), '~w="~w"', [Name, Value]).
-
 % Generate unique request ID
 generate_request_id(ID) :-
     get_time(Now),
     format(atom(TempID), 'req_~w', [Now]),
-    atom_string(TempID, TempIDStr),
-    sub_atom(TempIDStr, 0, 8, _, ID).
+    atom_string(TempID, ID).
 
 % Start HTTP server and keep it running
 start_server(Port) :-

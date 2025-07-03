@@ -1,0 +1,45 @@
+
+(
+    R match ( RID a get; path "/". ).
+    lmdb readStart ReadTxn.
+    [TaskHTML ( ReadTxn lmdbQuery { T task Task; description Description. }. ["<li>" Task " - " Description "</li>"] sconcat TaskHTML.) ] [collect >> sconcat] TodosHTML. 
+    lmdb end ReadTxn.
+    
+    
+    [
+        "<html><head><title>Simple Todo App</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
+        <main class='container'>
+        <h1>My Todo App</h1>
+        <form method='post' action='/todo'>
+        <fieldset role='group'>
+        <input type='text' name='task' placeholder='Title' required>
+        <input type='text' name='description' placeholder='Description' required>
+        <input type='submit' value='Add Todo 3'>
+        </fieldset>
+        </form>
+        <h2>Your Todos:</h2>
+        <ul>"
+        TodosHTML
+        "</ul>
+        </main>
+        </body></html>"
+    ] sconcat ResponseHTML.
+) => ( R response (
+    RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
+    body ResponseHTML.
+). ).
+
+
+
+(
+    R match ( RID a post; path "/todo"; body ( task = Task. description = Description. ). ).
+    lmdb readWriteStart WriteTxn. 
+    WriteTxn lmdbInsert { RID task Task; description Description.  }. 
+    lmdb end WriteTxn.
+) => ( R response (
+    RID status 302; headers ( "Location" = "/". ); body "".
+). ).
+
+
+
+system runWebServer 3000.

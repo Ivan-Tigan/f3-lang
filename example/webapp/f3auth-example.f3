@@ -1,0 +1,52 @@
+system include "./f3auth.f3".
+(
+    R match ( RID a get; path "/".); [f3AuthSession >> match] ( sub = UserId. name = UserName. email = UserEmail. ).
+    
+    system cut [].
+    
+    [
+        "<html><head><title>F3 Auth Profile</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
+        <main class='container'>
+        <h1>F3 Auth Profile</h1>
+        <div class='card'>
+        <h2>Welcome, " UserName "!</h2>
+        <p><strong>User ID:</strong> " UserId "</p>
+        <p><strong>Name:</strong> " UserName "</p>
+        <p><strong>Email:</strong> " UserEmail "</p>
+        </div>
+        <nav>
+        <a href='/f3auth/logout' class='btn btn-danger'>Logout</a>
+        </nav>
+        </main>
+        </body></html>"
+    ] sconcat ResponseHTML.
+) => ( R response (
+    RID status 200; 
+    headers ( "Content-Type" = "text/html; charset=utf-8". );
+    body ResponseHTML.
+). ).
+
+(
+    R match ( RID a get; path "/". ).
+    
+    [
+        "<html><head><title>F3 Auth Profile</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
+        <main class='container'>
+        <h1>F3 Auth Profile</h1>
+        <div class='card'>
+        <h2>Not Logged In</h2>
+        <p>Please log in to access your profile.</p>
+        </div>
+        <nav>
+        <a href='/f3auth/login' class='btn'>Login with Logto</a>
+        </nav>
+        </main>
+        </body></html>"
+    ] sconcat ResponseHTML.
+) => ( R response (
+    RID status 200; 
+    headers ( "Content-Type" = "text/html; charset=utf-8". );
+    body ResponseHTML.
+). ).
+
+system runWebServer 3000.

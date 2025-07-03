@@ -42,6 +42,12 @@ body_pair_to_json(p(Name,=,graph(SubBody)), Name-SubJSON) :-
     body_to_json(graph(SubBody), SubJSON).
 body_pair_to_json(p(Name,=,Value), Name-Value).
 
+% Convert graph body to form data list
+body_to_form(graph(Body), FormPairs) :-
+    maplist(body_pair_to_form, Body, FormPairs).
+
+body_pair_to_form(p(Name,=,Value), Name=Value).
+
 % Convert JSON to graph format
 json_to_graph(json(Fields), graph(GraphFields)) :-
     maplist(json_field_to_graph, Fields, GraphFields).
@@ -49,6 +55,12 @@ json_to_graph(json(Fields), graph(GraphFields)) :-
 json_field_to_graph(Name=json(SubFields), p(Name,=,graph(GraphSubFields))) :-
     !, % Cut for when we have nested JSON
     maplist(json_field_to_graph, SubFields, GraphSubFields).
+json_field_to_graph(Name='@'(true), p(Name,=,true)) :- !.
+json_field_to_graph(Name='@'(false), p(Name,=,false)) :- !.
+json_field_to_graph(Name='@'(null), p(Name,=,null)) :- !.
+json_field_to_graph(Name=Value, p(Name,=,ValueString)) :-
+    atom(Value), !,
+    atom_string(Value, ValueString).
 json_field_to_graph(Name=Value, p(Name,=,Value)).
 
 user:builtin(fetch).
@@ -57,30 +69,56 @@ user:b(Request, fetch, Response) :-
     % Extract components from Request
     Request = graph(RequestProps),
     memberchk(p(_, url, BaseURL), RequestProps),
-    memberchk(p(_, params, Params), RequestProps),
-    memberchk(p(_, headers, Headers), RequestProps),
     memberchk(p(_, a, Method), RequestProps),
     
-    % Convert params to query string
-    params_to_query(Params, QueryString),
-    format(atom(URL), '~w?~w', [BaseURL, QueryString]),
-    
-    % Convert headers to options
-    headers_to_options(Headers, HeaderOptions),
-    
-    % Handle different HTTP methods
-    (Method = post ->
-        memberchk(p(_, body, Body), RequestProps),
-        body_to_json(Body, JSONBody),
-        append(HeaderOptions, [json(JSONBody)], Options),
-        http_post(URL, json(JSONBody), ResponseData, Options)
-    ; Method = get ->
-        append(HeaderOptions, [], Options),
-        http_get(URL, ResponseData, Options)
+    % Extract optional params
+    (memberchk(p(_, params, Params), RequestProps) ->
+        params_to_query(Params, QueryString),
+        format(atom(URL), '~w?~w', [BaseURL, QueryString])
+    ;   URL = BaseURL
     ),
     
-    % Convert JSON response to graph format
-    json_to_graph(ResponseData, ResponseBody),
+    % Extract optional headers
+    (memberchk(p(_, headers, Headers), RequestProps) ->
+        headers_to_options(Headers, HeaderOptions)
+    ;   HeaderOptions = []
+    ),
+    
+    % Handle different HTTP methods with error handling
+    catch(
+        (Method = post ->
+            (memberchk(p(_, body, Body), RequestProps) ->
+                % Check if we have form data by looking at content-type
+                (memberchk(request_header("Content-Type"="application/x-www-form-urlencoded"), HeaderOptions) ->
+                    % Handle form data
+                    body_to_form(Body, FormData),
+                    append(HeaderOptions, [form(FormData), status_code(_)], Options),
+                    http_post(URL, form(FormData), ResponseData, Options)
+                ;   % Handle JSON data
+                    body_to_json(Body, JSONBody),
+                    append(HeaderOptions, [json(JSONBody), status_code(_)], Options),
+                    http_post(URL, json(JSONBody), ResponseData, Options)
+                )
+            ;   % POST without body
+                append(HeaderOptions, [status_code(_)], Options),
+                http_post(URL, '', ResponseData, Options)
+            )
+        ; Method = get ->
+            append(HeaderOptions, [status_code(_)], Options),
+            http_get(URL, ResponseData, Options)
+        ),
+        Error,
+        (format(user_error, 'HTTP Error: ~w~n', [Error]), 
+         ResponseData = json([error=Error]))
+    ),
+    
+    % Convert response to graph format
+    (is_dict(ResponseData) ->
+        json_to_graph(ResponseData, ResponseBody)
+    ; ResponseData = json(_) ->
+        json_to_graph(ResponseData, ResponseBody)
+    ;   ResponseBody = graph([p(text, =, ResponseData)])
+    ),
     
     % Construct response
     Response = graph([
@@ -126,9 +164,9 @@ test(post_request_nested) :-
     ResponseBody = graph(Fields),
     memberchk(p(json,=,graph(SentData)), Fields),
     memberchk(p(user,=,graph(UserData)), SentData),
-    memberchk(p(name,=,'John'), UserData),
+    memberchk(p(name,=,"John"), UserData),
     memberchk(p(address,=,graph(AddressData)), UserData),
-    memberchk(p(city,=,'New York'), AddressData).
+    memberchk(p(city,=,"New York"), AddressData).
 
 test(get_request) :-
     Request = graph([
@@ -154,9 +192,36 @@ test(get_request) :-
     ]),
     ResponseBody = graph(Fields),
     memberchk(p(args,=,graph(Args)), Fields),
-    memberchk(p(q,=,'test+query'), Args),
+    memberchk(p(q,=,"test+query"), Args),
     memberchk(p(headers,=,graph(Headers)), Fields),
-    memberchk(p('X-Test-Header',=,'test-value'), Headers).
+    memberchk(p('X-Test-Header',=,"test-value"), Headers).
+
+test(post_form_request) :-
+    Request = graph([
+        p(1, a, post),
+        p(1, url, "https://httpbin.org/post"),
+        p(1, headers, graph([
+            p("Content-Type",=,"application/x-www-form-urlencoded")
+        ])),
+        p(1, body, graph([
+            p("grant_type",=,"authorization_code"),
+            p("code",=,"test_code_123"),
+            p("client_id",=,"test_client"),
+            p("client_secret",=,"secret123")
+        ]))
+    ]),
+    format('~n~nForm POST Request:~n~w~n~n', [Request]),
+    b(Request, fetch, Response),
+    format('~nForm POST Response:~n~w~n~n', [Response]),
+    Response = graph([
+        p(response, headers, _),
+        p(response, body, ResponseBody)
+    ]),
+    ResponseBody = graph(Fields),
+    memberchk(p(form,=,graph(FormData)), Fields),
+    % Verify the form data was sent correctly
+    memberchk(p(grant_type,=,"authorization_code"), FormData),
+    memberchk(p(client_id,=,"test_client"), FormData).
 
 :- end_tests(http_client).
 :- set_test_options([silent(false)]).

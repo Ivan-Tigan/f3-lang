@@ -1,7 +1,10 @@
 FROM ubuntu:22.04
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.kernel.org/ubuntu|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.kernel.org/ubuntu|g' /etc/apt/sources.list
 
 # Add SWI-Prolog development PPA and install build dependencies
-RUN apt-get update && apt-get install -y software-properties-common && \
+RUN apt-get update && \ 
+    apt-get install -y software-properties-common && \
     add-apt-repository ppa:swi-prolog/devel && \
     apt-get update && \
     apt-get install -y \

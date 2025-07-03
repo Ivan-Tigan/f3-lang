@@ -1,0 +1,70 @@
+f3Auth encryptionSecretKey "Some secret key";
+    clientId "0xdrjgnfvjdpn7wfgs1z2";
+    clientSecret "CDlhWVPjoX0K6yZe9BDuajrRgEsbZ3DI";
+    loginPath "/f3auth/login";
+    logoutPath "/f3auth/logout";
+    callbackPath "/f3auth/callback";
+    appUrl "http://localhost:3000";
+    loginRedirect "/";
+    logoutRedirect "/".
+(
+    R match ( RID cookies ( f3_auth_encrypted_session = EncryptedSession. ). ).
+    f3Auth encryptionSecretKey F3AuthEncryptionSecretKey.
+    EncryptedSession [[decrypt F3AuthEncryptionSecretKey] >> parseJson] F3AuthSessionInfo.
+) => (
+    R f3AuthSession F3AuthSessionInfo.
+).
+
+(
+    f3Auth loginPath LoginPath; callbackPath CallbackPath; appUrl AppUrl. 
+    [AppUrl CallbackPath] sconcat CallbackURL.
+    R match ( RID a get; path LoginPath. ). RID sha256 StateHash.
+    ["f3auth_state=" StateHash "; HttpOnly; Secure; Path=/; Max-Age=600"] sconcat F3Cookie.
+    [
+        "https://logto.f3web.app/oidc/auth"
+        "?client_id=0xdrjgnfvjdpn7wfgs1z2"
+        "&response_type=code"
+        "&scope=openid%20profile%20email"
+        "&redirect_uri=" CallbackURL
+        "&state=" StateHash
+        "&prompt=login"
+    ] sconcat AuthURL.
+) => ( 
+    R response (RID status 302; headers ( "Location" = AuthURL.  "Set-Cookie" = F3Cookie.).). 
+).
+
+(
+    R match ( RID a get; path "/f3auth/callback"; params ( code = Code. state = State. ); cookies ( f3auth_state = State. ). ).
+    ( 
+        tokenReq a post; 
+        url "https://logto.f3web.app/oidc/token";
+        headers ( "Content-Type" = "application/x-www-form-urlencoded". );
+        body ( 
+            "grant_type" = "authorization_code".
+            "code" = Code.
+            "redirect_uri" = "http://localhost:3000/f3auth/callback".
+            "client_id" = "0xdrjgnfvjdpn7wfgs1z2".
+            "client_secret" = "CDlhWVPjoX0K6yZe9BDuajrRgEsbZ3DI".
+        ).
+     ) [fetch >> match] ( response body ( id_token = IdToken. ). ).
+
+    f3Auth encryptionSecretKey F3AuthEncryptionSecretKey.
+    IdToken [[splitString "."] >> [1] >> [reverse base64Url]] DecodedPayload.
+    DecodedPayload [parseJson >> match] ( sub = UserId.  name = UserName.  email = UserEmail.).
+    DecodedPayload [encrypt F3AuthEncryptionSecretKey] EncryptedPayload.
+    
+    ["f3_auth_encrypted_session=" EncryptedPayload "; HttpOnly; Secure; Path=/; Max-Age=3600"] sconcat AuthCookie.
+    
+) => ( 
+    R response ( RID status 302; headers ( "Location" = "/f3auth/profile". "Set-Cookie" = AuthCookie.).). 
+).
+
+(
+    R match ( RID a get; path "/f3auth/logout". ).
+) => ( R response (
+    RID status 302;
+    headers (
+        "Location" = "/f3auth/profile".
+        "Set-Cookie" = "f3_auth_encrypted_session=; HttpOnly; Secure; Path=/; Max-Age=0".
+    ).
+). ).

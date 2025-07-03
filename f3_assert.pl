@@ -7,6 +7,10 @@
 :- use_module(builtins/http).
 :- use_module(builtins/match).
 :- use_module(builtins/lmdb).
+:- use_module(builtins/base64).
+:- use_module(builtins/json).
+:- use_module(builtins/crypto).
+:- use_module(builtins/pipe).
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
 :- multifile loaded/1.
@@ -47,13 +51,16 @@ builtin(collect).
 builtin(sha256). 
 builtin([Index]) :- number(Index), !.
 builtin(hasGraph).
-builtin([X, >>, Y]).
+% builtin([X, >>, Y]). % Now handled by pipe.pl
 builtin(replaceQuotes).
 builtin(lconcat).
 builtin(not).
 builtin(log).
 builtin('!=').
 builtin(iter).
+builtin([splitString, Separator]). 
+builtin(toString).
+builtin([reverse, Pred]).
 
 b(A, =, B) :- A = B.
 b(A, '!=', B) :- A \= B.
@@ -61,26 +68,37 @@ b(A, >, B) :- A > B.
 b(A, <, B) :- A < B.
 b(A, >=, B) :- A >= B.
 b(A, =<, B) :- A =< B.
-b(system, log, X) :- node_string(X, S),!, nl.
-b(system, log, X) :- write_canonical(X), nl.
-
+b(system, log, X) :- node_string(X, S),!, format(user_error, "~w~n", [S]).
+b(system, log, X) :- format(user_error, "~q~n", [X]), !.
+b(X, toString, S) :- node_string(X, S).
 % Iter builtin to match each element of a list
 b(List, iter, Element) :- 
     is_list(List),
     member(Element, List).
 
 b(system, not, p(A,B,C)) :- \+ p(A,B,C).
-% String concatenation builtin
-b(XS, sconcat, Res) :- 
-   atomic_list_concat(XS, '', A),
-   atom_string(A, Res).
+b(XS, sconcat, Res) :- atomics_to_string(XS, Res) .
+b(S, [splitString, Separator], Res) :- 
+   atom_string(S, SStr),
+   format(user_error, "ZZZZZZZZZZZZZZZZZZZZ Splitting string: ~q with separator: ~q~n", [SStr, Separator]),
+    split_string(SStr, Separator, "", Res),
+    
+   format(user_error, "ZZZZZZZZZZZZZZZZZZZZ split success: ~q~n", [Res])
+    .  
 
+b(X, [reverse, Pred], Y) :- 
+   builtin(Pred),
+   !,
+   b(Y, Pred, X).  
+b(X, [reverse, Pred], Y) :-
+   p(Y, Pred, X), !.  
+   
 b([Xs, Ys], lconcat, Res) :- 
    append(Xs, Ys, Res).
 b(Xs, [Index], Element) :- 
     number(Index),
     !,
-    nth1(Index, Xs, Element).
+    nth0(Index, Xs, Element).
 b(X, replaceQuotes, Y) :-
    replace_substring(X, "'", "\"", Res).
    
@@ -89,10 +107,11 @@ b([Path, graph(G)], collect, Results) :-
     list_to_conjunction(G, Conjunction),
     % Collect first argument from each triple that matches the pattern
     findall(Path, Conjunction, Results).
-b(A, [X, >>, Y], B) :- builtin(X), builtin(Y), !, b(A, X, C), b(C, Y, B) .
-b(A, [X, >>, Y], B) :- builtin(X), !, b(A, X, C), p(C, Y, B) .
-b(A, [X, >>, Y], B) :- builtin(Y), !, p(A, X, C), b(C, Y, B) .
-b(A, [X, >>, Y], B) :- p(A, X, C), p(C, Y, B) .
+% Old >> implementation now handled by pipe.pl
+% b(A, [X, >>, Y], B) :- builtin(X), builtin(Y), !, b(A, X, C), b(C, Y, B) .
+% b(A, [X, >>, Y], B) :- builtin(X), !, b(A, X, C), p(C, Y, B) .
+% b(A, [X, >>, Y], B) :- builtin(Y), !, p(A, X, C), b(C, Y, B) .
+% b(A, [X, >>, Y], B) :- p(A, X, C), p(C, Y, B) .
 
 
 
@@ -211,7 +230,6 @@ transform_condition(p(system,cut,[]), !) :- !.
 transform_condition(p(system,fail,[]), fail) :- !. 
 % Convert a single condition to the right form (b/3 or p/3)
 transform_condition(p(S,P,O), b(S,P,O)) :- 
-   ground(P),  % Only check for builtins if P is ground
    builtin(P),
    !.
 transform_condition(p(S,P,O), p(S,P,O)).

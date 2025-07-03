@@ -1,0 +1,25 @@
+# Ignore example files during build (users will mount them)
+example/
+data/
+*.log
+*.tmp
+.git/
+.gitignore
+README.md
+build.sh
+install.sh
+
+# Ignore build artifacts that shouldn't be copied
+f3
+f3p
+lmdb_init.pl
+
+# Ignore editor files
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
