@@ -314,22 +314,46 @@ consult_string(S) :-
    close(Stream),
    consult(File).
 consult_f3_file(F) :-
-   (f3_loaded(F) -> true; 
+   consult_f3_file_with_base(F, '').
+
+consult_f3_file_with_base(F, BaseDir) :-
+   % Resolve file path relative to base directory
+   (BaseDir = '' ->
+      ResolvedFile = F
+   ;  % Handle relative paths properly  
+      (sub_atom(F, 0, 2, _, './') ->
+         % Remove ./ prefix and resolve relative to BaseDir
+         sub_atom(F, 2, _, 0, RelativePath),
+         atom_concat(BaseDir, '/', BaseDirSlash),
+         atom_concat(BaseDirSlash, RelativePath, ResolvedFile)
+      ;  % Regular relative path
+         atom_concat(BaseDir, '/', BaseDirSlash),
+         atom_concat(BaseDirSlash, F, ResolvedFile)
+      )
+   ),
+   
+   % Get absolute path to avoid duplicates
+   absolute_file_name(ResolvedFile, AbsoluteFile),
+   
+   (f3_loaded(AbsoluteFile) -> true; 
 
    % Try F3_HOME env first, then SNAP, then fallback to local
    (getenv('F3_HOME', Home) -> 
-      b([Home, "/f3p ", F], sconcat, Cmd)
+      b([Home, "/f3p ", ResolvedFile], sconcat, Cmd)
    ; getenv('SNAP', Snap) -> 
-      b([Snap, "/bin/f3p ", F], sconcat, Cmd)
+      b([Snap, "/bin/f3p ", ResolvedFile], sconcat, Cmd)
    ;   
-      b(["./f3p ", F], sconcat, Cmd)
+      b(["./f3p ", ResolvedFile], sconcat, Cmd)
    ),
    run_command(Cmd, Program),
    consult_string(Program),
-   assertz(f3_loaded(F)),
+   assertz(f3_loaded(AbsoluteFile)),
 
+   % Get directory of current file for relative includes
+   file_directory_name(AbsoluteFile, CurrentDir),
+   
    forall((p(system, include, E)), (
-      consult_f3_file(E)
+      consult_f3_file_with_base(E, CurrentDir)
    ))
 ).
 

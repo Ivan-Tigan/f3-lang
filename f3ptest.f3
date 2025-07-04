@@ -1,0 +1,9 @@
+s p [1.2], 2, 3.
+
+(
+    s p ?X.
+) => (
+    res is ?X.
+).
+
+system query [?X (res is ?X.)]. 

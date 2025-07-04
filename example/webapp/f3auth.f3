@@ -1,12 +1,3 @@
-f3Auth encryptionSecretKey "Some secret key";
-    clientId "0xdrjgnfvjdpn7wfgs1z2";
-    clientSecret "CDlhWVPjoX0K6yZe9BDuajrRgEsbZ3DI";
-    loginPath "/f3auth/login";
-    logoutPath "/f3auth/logout";
-    callbackPath "/f3auth/callback";
-    appUrl "http://localhost:3000";
-    loginRedirect "/";
-    logoutRedirect "/".
 (
     R match ( RID cookies ( f3_auth_encrypted_session = EncryptedSession. ). ).
     f3Auth encryptionSecretKey F3AuthEncryptionSecretKey.
@@ -14,10 +5,9 @@ f3Auth encryptionSecretKey "Some secret key";
 ) => (
     R f3AuthSession F3AuthSessionInfo.
 ).
-
+(f3Auth callbackPath CallbackPath; appUrl AppUrl. [AppUrl CallbackPath] sconcat CallbackURL.) => (f3Auth callbackUrl CallbackURL. ).
 (
-    f3Auth loginPath LoginPath; callbackPath CallbackPath; appUrl AppUrl. 
-    [AppUrl CallbackPath] sconcat CallbackURL.
+    f3Auth loginPath LoginPath; callbackUrl CallbackURL.
     R match ( RID a get; path LoginPath. ). RID sha256 StateHash.
     ["f3auth_state=" StateHash "; HttpOnly; Secure; Path=/; Max-Age=600"] sconcat F3Cookie.
     [
@@ -34,7 +24,8 @@ f3Auth encryptionSecretKey "Some secret key";
 ).
 
 (
-    R match ( RID a get; path "/f3auth/callback"; params ( code = Code. state = State. ); cookies ( f3auth_state = State. ). ).
+    f3Auth clientId ClientId; clientSecret ClientSecret; loginPath LoginPath; callbackPath CallbackPath; callbackUrl CallbackURL; appUrl AppUrl; loginRedirect LoginRedirect. 
+    R match ( RID a get; path CallbackPath; params ( code = Code. state = State. ); cookies ( f3auth_state = State. ). ).
     ( 
         tokenReq a post; 
         url "https://logto.f3web.app/oidc/token";
@@ -42,9 +33,9 @@ f3Auth encryptionSecretKey "Some secret key";
         body ( 
             "grant_type" = "authorization_code".
             "code" = Code.
-            "redirect_uri" = "http://localhost:3000/f3auth/callback".
-            "client_id" = "0xdrjgnfvjdpn7wfgs1z2".
-            "client_secret" = "CDlhWVPjoX0K6yZe9BDuajrRgEsbZ3DI".
+            "redirect_uri" = CallbackURL.
+            "client_id" = ClientId.
+            "client_secret" = ClientSecret.
         ).
      ) [fetch >> match] ( response body ( id_token = IdToken. ). ).
 
@@ -56,15 +47,16 @@ f3Auth encryptionSecretKey "Some secret key";
     ["f3_auth_encrypted_session=" EncryptedPayload "; HttpOnly; Secure; Path=/; Max-Age=3600"] sconcat AuthCookie.
     
 ) => ( 
-    R response ( RID status 302; headers ( "Location" = "/f3auth/profile". "Set-Cookie" = AuthCookie.).). 
+    R response ( RID status 302; headers ( "Location" = LoginRedirect. "Set-Cookie" = AuthCookie.).). 
 ).
 
 (
-    R match ( RID a get; path "/f3auth/logout". ).
+    f3Auth logoutPath LogoutPath; logoutRedirect LogoutRedirect.
+    R match ( RID a get; path LogoutPath. ).
 ) => ( R response (
     RID status 302;
     headers (
-        "Location" = "/f3auth/profile".
+        "Location" = LogoutRedirect.
         "Set-Cookie" = "f3_auth_encrypted_session=; HttpOnly; Secure; Path=/; Max-Age=0".
     ).
 ). ).

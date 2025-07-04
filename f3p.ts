@@ -10,8 +10,8 @@ const semicolon = P.string(";").trim(ws);
 
 // const pNumber = P.regexp(/[0-9]+/).map(r => parseInt(r)).desc("number");
 const pNumber = P.regexp(/[-]?[0-9]+(?:\/[0-9]+|\.[0-9]+)?/).desc("number");
-const pIdentifier = P.regexp(/[a-z][a-zA-Z0-9_-]*/).desc("identifier");
-const pVar = P.regexp(/[A-Z][a-zA-Z0-9_-]*/).desc("variable");
+const pIdentifier = P.regexp(/[a-zA-Z:_][a-zA-Z0-9:_-]*/).desc("identifier");
+const pVar = P.regexp(/[?][a-zA-Z0-9_]*/).desc("variable");
 // const pSymbol = P.regexp(/[+-=*/^<>~!?|&]+/).desc("symbol");
 const pSymbol = P.regexp(/([+\-=*/^<>~!&]|(?!\[|)(?!\|])\|)+/).desc("symbol");
 const pString = ws
@@ -134,8 +134,8 @@ const pTriples = (s?: Node) =>
 
 const nodeToProlog = (node: Node): string => {
   return typeof node === "string"
-    ? node.charAt(0).toUpperCase() !== '"'
-      ? `${node}`
+    ? node.charAt(0) === "?"
+      ? `F3_VAR_PREFIX_${node.slice(1)}`
       : `${node}`
     : typeof node === "number"
     ? `${node}`
