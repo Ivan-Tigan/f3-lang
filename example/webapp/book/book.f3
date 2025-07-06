@@ -1,9 +1,9 @@
 // Main booking page - list calendars and create new ones
 (
-    R match ( RID a get; path "/". ).
-    lmdb readStart ReadTxn.
-    [CalendarHTML ( ReadTxn lmdbQuery { C a calendar; name Name. }. ["<div class='card'><h3>" Name "</h3><a href='/events?calendar=" Name "' class='btn'>View Events</a><a href='/create-event?calendar=" Name "' class='btn secondary'>Create Event</a></div>"] sconcat CalendarHTML.) ] [collect >> sconcat] CalendarsHTML. 
-    lmdb end ReadTxn.
+    ?R match ( ?RID a get; path "/". ).
+    lmdb readStart ?ReadTxn.
+    [?CalendarHTML ( ?ReadTxn lmdbQuery { ?C a calendar; name ?Name. }. ["<div class='card'><h3>" ?Name "</h3><a href='/events?calendar=" ?Name "' class='btn'>View Events</a><a href='/create-event?calendar=" ?Name "' class='btn secondary'>Create Event</a></div>"] sconcat ?CalendarHTML.) ] [collect >> sconcat] ?CalendarsHTML. 
+    lmdb end ?ReadTxn.
     
     [
         "<html><head><title>Booking System</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
@@ -21,15 +21,15 @@
         <section>
         <h2>Existing Calendars</h2>
         <div class='grid'>"
-        CalendarsHTML
+        ?CalendarsHTML
         "</div>
         </section>
         </main>
         </body></html>"
-    ] sconcat ResponseHTML.
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
-    body ResponseHTML.
+    ] sconcat ?ResponseHTML.
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
+    body ?ResponseHTML.
 ). ).
 [
     [h1 class "container"] "Booking System" [/ h1]
@@ -47,51 +47,51 @@
 ] test htmlsyntax.
 // Create calendar
 (
-    R match ( RID a post; path "/calendar"; body ( name = Name. ). ).
-    lmdb readWriteStart WriteTxn. 
-    WriteTxn lmdbInsert { RID a calendar; name Name. }. 
-    lmdb end WriteTxn.
-) => ( R response (
-    RID status 302; headers ( "Location" = "/". ); body "".
+    ?R match ( ?RID a post; path "/calendar"; body ( name = ?Name. ). ).
+    lmdb readWriteStart ?WriteTxn. 
+    ?WriteTxn lmdbInsert { ?RID a calendar; name ?Name. }. 
+    lmdb end ?WriteTxn.
+) => ( ?R response (
+    ?RID status 302; headers ( "Location" = "/". ); body "".
 ). ).
 
 // View calendar events
 (
-    R match ( RID a get; path "/events"; params ( calendar = CalendarName. ). ).
-    lmdb readStart ReadTxn.
-    [EventHTML ( ReadTxn lmdbQuery { C a calendar; name CalendarName. E event Name; calendar C; startTime Start; duration Duration; frequency Freq; capacity Cap; description Desc. }. ["<div class='card'><h4>" Name "</h4><p><strong>Start:</strong> " Start "</p><p><strong>Duration:</strong> " Duration " minutes</p><p><strong>Frequency:</strong> " Freq "</p><p><strong>Capacity:</strong> " Cap "</p><p><strong>Description:</strong> " Desc "</p><a href='/book?event=" Name "' class='btn'>Book This Event</a></div>"] sconcat EventHTML.) ] [collect >> sconcat] EventsHTML. 
-    lmdb end ReadTxn.
+    ?R match ( ?RID a get; path "/events"; params ( calendar = ?CalendarName. ). ).
+    lmdb readStart ?ReadTxn.
+    [?EventHTML ( ?ReadTxn lmdbQuery { ?C a calendar; name ?CalendarName. ?E event ?Name; calendar ?C; startTime ?Start; duration ?Duration; frequency ?Freq; capacity ?Cap; description ?Desc. }. ["<div class='card'><h4>" ?Name "</h4><p><strong>Start:</strong> " ?Start "</p><p><strong>Duration:</strong> " ?Duration " minutes</p><p><strong>Frequency:</strong> " ?Freq "</p><p><strong>Capacity:</strong> " ?Cap "</p><p><strong>Description:</strong> " ?Desc "</p><a href='/book?event=" ?Name "' class='btn'>Book This Event</a></div>"] sconcat ?EventHTML.) ] [collect >> sconcat] ?EventsHTML. 
+    lmdb end ?ReadTxn.
     
     [
-        "<html><head><title>Calendar: " CalendarName "</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
+        "<html><head><title>Calendar: " ?CalendarName "</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
         <main class='container'>
-        <h1>Calendar: " CalendarName "</h1>
-        <nav><a href='/' class='btn secondary'>&lt; Back to Calendars</a><a href='/create-event?calendar=" CalendarName "' class='btn'>Create Event</a></nav>
+        <h1>Calendar: " ?CalendarName "</h1>
+        <nav><a href='/' class='btn secondary'>&lt; Back to Calendars</a><a href='/create-event?calendar=" ?CalendarName "' class='btn'>Create Event</a></nav>
         <section>
         <h2>Events</h2>
         <div class='grid'>"
-        EventsHTML
+        ?EventsHTML
         "</div>
         </section>
         </main>
         </body></html>"
-    ] sconcat ResponseHTML.
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
-    body ResponseHTML.
+    ] sconcat ?ResponseHTML.
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
+    body ?ResponseHTML.
 ). ).
 
 // Create event form
 (
-    R match ( RID a get; path "/create-event"; params ( calendar = CalendarName. ). ).
+    ?R match ( ?RID a get; path "/create-event"; params ( calendar = ?CalendarName. ). ).
     
     [
-        "<html><head><title>Create Event - " CalendarName "</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
+        "<html><head><title>Create Event - " ?CalendarName "</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
         <main class='container'>
-        <h1>Create Event for " CalendarName "</h1>
-        <nav><a href='/events?calendar=" CalendarName "' class='btn secondary'>&lt; Back to Calendar</a></nav>
+        <h1>Create Event for " ?CalendarName "</h1>
+        <nav><a href='/events?calendar=" ?CalendarName "' class='btn secondary'>&lt; Back to Calendar</a></nav>
         <form method='post' action='/create-event'>
-        <input type='hidden' name='calendar' value='" CalendarName "'>
+        <input type='hidden' name='calendar' value='" ?CalendarName "'>
         <div class='grid'>
         <div>
         <label for='name'>Event Name</label>
@@ -127,50 +127,50 @@
         </form>
         </main>
         </body></html>"
-    ] sconcat ResponseHTML.
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
-    body ResponseHTML.
+    ] sconcat ?ResponseHTML.
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
+    body ?ResponseHTML.
 ). ).
 
 // Create event
 (
-    R match ( RID a post; path "/create-event"; body ( calendar = CalendarName. name = Name. startTime = StartTime. duration = Duration. frequency = Frequency. capacity = Capacity. description = Description. ). ).
-    lmdb readWriteStart WriteTxn. 
-    WriteTxn lmdbInsert { RID event Name; calendar CalendarName; startTime StartTime; duration Duration; frequency Frequency; capacity Capacity; description Description. }. 
-    lmdb end WriteTxn.
-    ["/events?calendar=" CalendarName] sconcat RedirectURL.
-) => ( R response (
-    RID status 302; headers ( "Location" = RedirectURL. ); body "".
+    ?R match ( ?RID a post; path "/create-event"; body ( calendar = ?CalendarName. name = ?Name. startTime = ?StartTime. duration = ?Duration. frequency = ?Frequency. capacity = ?Capacity. description = ?Description. ). ).
+    lmdb readWriteStart ?WriteTxn. 
+    ?WriteTxn lmdbInsert { ?RID event ?Name; calendar ?CalendarName; startTime ?StartTime; duration ?Duration; frequency ?Frequency; capacity ?Capacity; description ?Description. }. 
+    lmdb end ?WriteTxn.
+    ["/events?calendar=" ?CalendarName] sconcat ?RedirectURL.
+) => ( ?R response (
+    ?RID status 302; headers ( "Location" = ?RedirectURL. ); body "".
 ). ).
 
 // Book event form
 (
-    R match ( RID a get; path "/book"; params ( event = EventName. ). ).
-    lmdb readStart ReadTxn.
-    ReadTxn lmdbQuery { E event EventName; calendar CalendarName; startTime Start; duration Duration; frequency Freq; capacity Cap; description Desc. }.
-    lmdb end ReadTxn.
+    ?R match ( ?RID a get; path "/book"; params ( event = ?EventName. ). ).
+    lmdb readStart ?ReadTxn.
+    ?ReadTxn lmdbQuery { ?E event ?EventName; calendar ?CalendarName; startTime ?Start; duration ?Duration; frequency ?Freq; capacity ?Cap; description ?Desc. }.
+    lmdb end ?ReadTxn.
     
     [
-        "<html><head><title>Book Event: " EventName "</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
+        "<html><head><title>Book Event: " ?EventName "</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
         <main class='container'>
-        <h1>Book Event: " EventName "</h1>
-        <nav><a href='/events?calendar=" CalendarName "' class='btn secondary'>&lt; Back to Calendar</a></nav>
+        <h1>Book Event: " ?EventName "</h1>
+        <nav><a href='/events?calendar=" ?CalendarName "' class='btn secondary'>&lt; Back to Calendar</a></nav>
         <section>
         <h2>Event Details</h2>
         <div class='card'>
-        <p><strong>Calendar:</strong> " CalendarName "</p>
-        <p><strong>Start Time:</strong> " Start "</p>
-        <p><strong>Duration:</strong> " Duration " minutes</p>
-        <p><strong>Frequency:</strong> " Freq "</p>
-        <p><strong>Capacity:</strong> " Cap "</p>
-        <p><strong>Description:</strong> " Desc "</p>
+        <p><strong>Calendar:</strong> " ?CalendarName "</p>
+        <p><strong>Start Time:</strong> " ?Start "</p>
+        <p><strong>Duration:</strong> " ?Duration " minutes</p>
+        <p><strong>Frequency:</strong> " ?Freq "</p>
+        <p><strong>Capacity:</strong> " ?Cap "</p>
+        <p><strong>Description:</strong> " ?Desc "</p>
         </div>
         </section>
         <section>
         <h2>Book Your Spot</h2>
         <form method='post' action='/book'>
-        <input type='hidden' name='event' value='" EventName "'>
+        <input type='hidden' name='event' value='" ?EventName "'>
         <div class='grid'>
         <div>
         <label for='name'>Your Name</label>
@@ -188,35 +188,35 @@
         </section>
         </main>
         </body></html>"
-    ] sconcat ResponseHTML.
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
-    body ResponseHTML.
+    ] sconcat ?ResponseHTML.
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
+    body ?ResponseHTML.
 ). ).
 
 // Process booking
 (
-    R match ( RID a post; path "/book"; body ( event = EventName. name = Name. email = Email. phone = Phone. ). ).
-    lmdb readWriteStart WriteTxn. 
-    WriteTxn lmdbInsert { RID booking Name; event EventName; email Email; phone Phone. }. 
-    lmdb end WriteTxn.
+    ?R match ( ?RID a post; path "/book"; body ( event = ?EventName. name = ?Name. email = ?Email. phone = ?Phone. ). ).
+    lmdb readWriteStart ?WriteTxn. 
+    ?WriteTxn lmdbInsert { ?RID booking ?Name; event ?EventName; email ?Email; phone ?Phone. }. 
+    lmdb end ?WriteTxn.
     
     [
         "<html><head><title>Booking Confirmed</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'></head><body>
         <main class='container'>
         <h1>Booking Confirmed!</h1>
         <div class='card'>
-        <h2>Thank you, " Name "!</h2>
-        <p>Your booking for <strong>" EventName "</strong> has been confirmed.</p>
-        <p>We'll contact you at <strong>" Email "</strong> with further details.</p>
+        <h2>Thank you, " ?Name "!</h2>
+        <p>Your booking for <strong>" ?EventName "</strong> has been confirmed.</p>
+        <p>We'll contact you at <strong>" ?Email "</strong> with further details.</p>
         </div>
         <nav><a href='/' class='btn'>Back to Calendars</a></nav>
         </main>
         </body></html>"
-    ] sconcat ResponseHTML.
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
-    body ResponseHTML.
+    ] sconcat ?ResponseHTML.
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
+    body ?ResponseHTML.
 ). ).
 
 system runWebServer 3000.

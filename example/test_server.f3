@@ -1,13 +1,13 @@
 x x x.
 // Accept websocket connections to the chat endpoint
 (
-    WS match (
-        WSID a wsConnection;
+    ?WS match (
+        ?WSID a wsConnection;
         path "/ws/chat".
     ).
     // x x x.
-) => ( WS response (
-    WSID
+) => ( ?WS response (
+    ?WSID
         status "accept";
         headers ( 
             "Sec-WebSocket-Protocol" = "chat".
@@ -18,21 +18,21 @@ x x x.
 
 // POST endpoint that broadcasts JSON messages to all chat clients
 (
-    R match ( RID a post; path "/api/chat/broadcast"; 
+    ?R match ( ?RID a post; path "/api/chat/broadcast"; 
     body (
-            message = Message.
-            sender = Sender.
+            message = ?Message.
+            sender = ?Sender.
         ).
     ).
     // Broadcast to all websocket connections
-    (WS a wsConnection; path "/ws/chat".) wsSend (
+    (?WS a wsConnection; path "/ws/chat".) wsSend (
         type = "message".
-        sender = Sender.
-        content = Message.
+        sender = ?Sender.
+        content = ?Message.
         timestamp = "2023-03-03".
     ).
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "application/json".);
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "application/json".);
         body (
             success = true.
             message = "Message broadcasted to all chat clients".
@@ -41,28 +41,28 @@ x x x.
 
 // Example HTTP endpoints from original file
 (
-    R match ( RID a get; path "/users"; params (param1 = Param1. param2 = Param2.).).
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8".);
+    ?R match ( ?RID a get; path "/users"; params (param1 = ?Param1. param2 = ?Param2.).).
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8".);
         body (
             root a div; class "flex flex-col"; child {|
-                1 a div; text Param1.
-                2 a div; text Param2.
+                1 a div; text ?Param1.
+                2 a div; text ?Param2.
             |}.
         ).
 ).).
 
 (
-    R match ( RID a post; path "/api/echo"; body ( name = Name.  age = Age.  email = Email.).).
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "application/json".);
+    ?R match ( ?RID a post; path "/api/echo"; body ( name = ?Name.  age = ?Age.  email = ?Email.).).
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "application/json".);
         body (
             success = true.
             message = "Data received successfully".
             data = (
-                name = Name.
-                age = Age.
-                email = Email.
+                name = ?Name.
+                age = ?Age.
+                email = ?Email.
                 timestamp = "2023-03-03".
                 processed = true.
             ).

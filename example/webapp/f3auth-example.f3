@@ -9,49 +9,41 @@ f3Auth encryptionSecretKey "Some secret key";
     loginRedirect "/";
     logoutRedirect "/".
 (
-    f3Auth logoutPath LogoutPath.
-    R [f3AuthSession >> match] (name = UserName.).
+    f3Auth logoutPath ?LogoutPath.
+    ?R [f3AuthSession >> match] (name = ?UserName.).
     system cut [].
-    [ "<div class='f3-auth-widget'> <span>Welcome, " UserName "!</span> <a href='" LogoutPath "'>Logout</a> </div>" ] sconcat HTML.
-) => (R f3AuthWidget HTML.).
+    [ "<div class='f3-auth-widget'> <span>Welcome, " ?UserName "!</span> <a href='" ?LogoutPath "'>Logout</a> </div>" ] sconcat ?HTML.
+) => (?R f3AuthWidget ?HTML.).
 (
-    f3Auth loginPath LoginPath.
-    [ "<div class='f3-auth-widget' > <span>Not logged in</span> <a href='" LoginPath "'>Login</a> </div>" ] sconcat HTML.
-) => (R f3AuthWidget HTML.).
+    f3Auth loginPath ?LoginPath.
+    [ "<div class='f3-auth-widget' > <span>Not logged in</span> <a href='" ?LoginPath "'>Login</a> </div>" ] sconcat ?HTML.
+) => (?R f3AuthWidget ?HTML.).
 
 (
-    R match ( RID a get; path "/".); f3AuthWidget F3AuthWidget.
-
+    ?R match ( ?RID a get; path "/".); f3AuthWidget ?F3AuthWidget.
     // @html
     [
         "<html>
         <head>
-        <title>F3 Auth Demo</title> 
-        <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'>
-
+            <title>F3 Auth Demo</title> 
+            <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'>
         </head>
         
         <body>
-        <main class='container'>
-        <nav>
-        <ul></ul>
-        <ul>
-        <li> " F3AuthWidget " </li>
-        </ul>
-        </nav>
-        <h1>F3 Auth Demo</h1>
-        <form>
-        <input type='text' name='name' placeholder='Name' required>
-        <input type='email' name='email' placeholder='Email' required>
-        </form>
-        </main>
+            <main class='container'>
+                <nav>
+                    <ul><li>F3</li></ul>
+                    <ul> <li>" ?F3AuthWidget "</li> </ul>
+                </nav>
+                <h1>F3 Auth Demo</h1>
+                <p>This is a simple demonstration of the F3 Auth system.</p>
+            </main>
         </body></html>"
-    ] sconcat ResponseHTML.
-) => ( R response (
-    RID status 200; 
+    ] sconcat ?ResponseHTML.
+) => ( ?R response (
+    ?RID status 200; 
     headers ( "Content-Type" = "text/html; charset=utf-8". );
-    body ResponseHTML.
+    body ?ResponseHTML.
 ). ).
-
 
 system runWebServer 3000.

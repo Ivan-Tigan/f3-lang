@@ -1,9 +1,9 @@
 
 (
-    R match ( RID a get; path "/". ).
-    lmdb readStart ReadTxn.
-    [TaskHTML ( ReadTxn lmdbQuery { T task Task; description Description. }. ["<li>" Task " - " Description "</li>"] sconcat TaskHTML.) ] [collect >> sconcat] TodosHTML. 
-    lmdb end ReadTxn.
+    ?R match ( ?RID a get; path "/". ).
+    lmdb readStart ?ReadTxn.
+    [?TaskHTML ( ?ReadTxn lmdbQuery { ?T task ?Task; description ?Description. }. ["<li>" ?Task " - " ?Description "</li>"] sconcat ?TaskHTML.) ] [collect >> sconcat] ?TodosHTML. 
+    lmdb end ?ReadTxn.
     
     
     [
@@ -19,25 +19,25 @@
         </form>
         <h2>Your Todos:</h2>
         <ul>"
-        TodosHTML
+        ?TodosHTML
         "</ul>
         </main>
         </body></html>"
-    ] sconcat ResponseHTML.
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
-    body ResponseHTML.
+    ] sconcat ?ResponseHTML.
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". );
+    body ?ResponseHTML.
 ). ).
 
 
 
 (
-    R match ( RID a post; path "/todo"; body ( task = Task. description = Description. ). ).
-    lmdb readWriteStart WriteTxn. 
-    WriteTxn lmdbInsert { RID task Task; description Description.  }. 
-    lmdb end WriteTxn.
-) => ( R response (
-    RID status 302; headers ( "Location" = "/". ); body "".
+    ?R match ( ?RID a post; path "/todo"; body ( task = ?Task. description = ?Description. ). ).
+    lmdb readWriteStart ?WriteTxn. 
+    ?WriteTxn lmdbInsert { ?RID task ?Task; description ?Description.  }. 
+    lmdb end ?WriteTxn.
+) => ( ?R response (
+    ?RID status 302; headers ( "Location" = "/". ); body "".
 ). ).
 
 

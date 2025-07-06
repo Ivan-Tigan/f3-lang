@@ -18,11 +18,11 @@
             "Content-Type" = "application/www".
             "X-Custom-Header" = "test-value".
         ).
-    ) [fetch >> match] (response body (json = Res.).).
-) => ( ress is Res.).
+    ) [fetch >> match] (response body (json = ?Res.).).
+) => ( ress is ?Res.).
 
-( [ 1/2 1/2 ] sum R.)
-=> (res is R.).
+( [ 1/2 1/2 ] sum ?R.)
+=> (res is ?R.).
 res is [3.4 1/2].
 
-system query [[X] ( res is X.)].
+system query [[?X] ( res is ?X.)].

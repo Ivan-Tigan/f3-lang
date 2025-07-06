@@ -2,35 +2,35 @@
 
 // Simple HTML string response with form
 (
-    R match ( RID a get; path "/test".).
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8".);
+    ?R match ( ?RID a get; path "/test".).
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8".);
         body "<html><body><h1>Hello World!</h1><p>This is a direct string response.</p><form method='post' action='/submit'><label>Name: <input type='text' name='name' required></label><br><br><label>Message: <textarea name='message' required></textarea></label><br><br><button type='submit'>Submit</button></form></body></html>".
 ).).
 
 // JSON string response
 (
-    R match ( RID a get; path "/api/test".).
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "application/json".);
+    ?R match ( ?RID a get; path "/api/test".).
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "application/json".);
         body "{\"message\": \"Hello from F3!\", \"status\": \"success\"}".
 ).).
 
 // Plain text response
 (
-    R match ( RID a get; path "/plain".).
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "text/plain".);
+    ?R match ( ?RID a get; path "/plain".).
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "text/plain".);
         body "This is a plain text response from F3!".
 ).).
 
 // Form submission endpoint
 (
-    R match ( RID a post; path "/submit"; body ( name = Name. message = Message.).).
-    ["<html><body><h1>Form Submitted!</h1><p>Thank you for your submission.</p><p><strong>Name:</strong> " Name "</p><p><strong>Message:</strong> " Message "</p><a href='/test'>Go back</a></body></html>"] sconcat ResHTML.
-) => ( R response (
-    RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8".);
-        body ResHTML.
+    ?R match ( ?RID a post; path "/submit"; body ( name = ?Name. message = ?Message.).).
+    ["<html><body><h1>Form Submitted!</h1><p>Thank you for your submission.</p><p><strong>Name:</strong> " ?Name "</p><p><strong>Message:</strong> " ?Message "</p><a href='/test'>Go back</a></body></html>"] sconcat ?ResHTML.
+) => ( ?R response (
+    ?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8".);
+        body ?ResHTML.
 ).).
 
 system runWebServer 3000.

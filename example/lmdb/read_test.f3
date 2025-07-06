@@ -1,11 +1,11 @@
 // Sequential LMDB test - insert then read
 (
-    lmdb readWriteStart ReadTxn.
-    A = alice.
-    ReadTxn lmdbQuery { A likes B.}.
-    lmdb end ReadTxn.
+    lmdb readWriteStart ?ReadTxn.
+    ?A = alice.
+    ?ReadTxn lmdbQuery { ?A likes ?B.}.
+    lmdb end ?ReadTxn.
 ) => (
-    result found [A B].
+    result found [?A ?B].
 ).
 // system debug listing.
-system query [ X ( result found X. ) ].
+system query [ ?X ( result found ?X. ) ].
