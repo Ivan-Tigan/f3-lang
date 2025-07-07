@@ -56,14 +56,14 @@ builtin(replaceQuotes).
 builtin(lconcat).
 builtin(not).
 builtin(log).
-builtin('!=').
+builtin(neq).
 builtin(iter).
 builtin([splitString, Separator]). 
 builtin(toString).
 builtin([reverse, Pred]).
 
 b(A, =, B) :- A = B.
-b(A, '!=', B) :- A \= B.
+b(A, neq, B) :- b(system, log, ["QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ", test, A, not, equal, to, B]), A \= B.
 b(A, >, B) :- A > B.
 b(A, <, B) :- A < B.
 b(A, >=, B) :- A >= B.

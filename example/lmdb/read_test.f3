@@ -1,9 +1,9 @@
 // Sequential LMDB test - insert then read
 (
-    lmdb readWriteStart ?ReadTxn.
+    ?ReadTxn lmdbStartR "./lmdb_data".
     ?A = alice.
     ?ReadTxn lmdbQuery { ?A likes ?B.}.
-    lmdb end ?ReadTxn.
+    ?ReadTxn lmdbEnd [].
 ) => (
     result found [?A ?B].
 ).

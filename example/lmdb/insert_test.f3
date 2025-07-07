@@ -1,11 +1,9 @@
 // Simple LMDB test - insert only
 (
-    lmdb readWriteStart ?WriteTxn.
-    ?WriteTxn lmdbInsert {
-        alice likes bob.
-    }.
-    // ?WriteTxn lmdbQuery { ?A likes ?B. }.
-    lmdb end ?WriteTxn.
+    ?WriteTxn 
+        lmdbStartRW "./lmdb_data";
+        lmdbInsert { alice likes bob. };
+        lmdbEnd [].
 ) => (
     result inserted ok.
 ).

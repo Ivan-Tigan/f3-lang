@@ -188,11 +188,15 @@ request_to_triple_pattern(Request, TriplePattern) :-
     ;   TriplesWithCookies = TriplesWithParams
     ),
     
-    % Extract other headers if needed
-    findall(p(HeaderName, =, HeaderValue), 
+    % Extract other headers if needed (convert values to strings for consistency)
+    findall(p(HeaderName, =, HeaderValueString), 
             (member(HeaderTerm, Request),
              HeaderTerm =.. [HeaderName, HeaderValue],
-             \+ member(HeaderName, [path_info, protocol, peer, pool, input, method, request_uri, path, http_version, cookie])
+             \+ member(HeaderName, [path_info, protocol, peer, pool, input, method, request_uri, path, http_version, cookie]),
+             (atom(HeaderValue) ->
+             atom_string(HeaderValue, HeaderValueString)
+             ;   term_string(HeaderValue, HeaderValueString)  % Add this line to handle non-atom values
+             )
             ), 
             HeaderTriples),
     (   HeaderTriples \= []
@@ -222,7 +226,7 @@ cookie_to_triple(Name=Value, p(Name, =, ValueString)) :-
 
 % Match request pattern against defined rules
 match_request_pattern(RequestPattern, Response) :-
-    format(user_error, "Trying to match pattern: ~w~n", [RequestPattern]),
+    format(user_error, "Trying to match pattern: ~q~n", [RequestPattern]),
     
     % Find the corresponding response
     catch(
@@ -319,7 +323,7 @@ start_server(Port) :-
     
     % Start HTTP server
     catch(
-        http_server(http_dispatch, [port(Port)]),
+        http_server(http_dispatch, [port(Port), bind_address('0.0.0.0')]),
         Error,
         (format(user_error, 'Server error: ~w~n', [Error]), fail)
     ),

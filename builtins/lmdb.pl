@@ -7,26 +7,24 @@
 :- multifile user:builtin/1.
 
 % Register builtins
-user:builtin(readStart).
-user:builtin(readWriteStart).
-user:builtin(end).
+user:builtin(lmdbStartR).
+user:builtin(lmdbStartRW).
+user:builtin(lmdbEnd).
 user:builtin(lmdbInsert).
 user:builtin(lmdbQuery).
 
 % Transaction management predicates
 
-% lmdb readStart Txn - Start a read-only transaction
-user:b(lmdb, readStart, Txn) :-
-    init_store,
-    lmdbstart(Txn, read).
+% Txn lmdbStartR "path" - Start a read-only transaction with custom path
+user:b(Txn, lmdbStartR, Path) :-
+    lmdbstart(Txn, read, Path).
 
-% lmdb readWriteStart Txn - Start a read-write transaction
-user:b(lmdb, readWriteStart, Txn) :-
-    init_store,
-    lmdbstart(Txn, write).
+% Txn lmdbStartRW "path" - Start a read-write transaction with custom path
+user:b(Txn, lmdbStartRW, Path) :-
+    lmdbstart(Txn, write, Path).
 
-% lmdb end Txn - End a transaction (commit/abort based on transaction type)
-user:b(lmdb, end, Txn) :-
+% Txn lmdbEnd [] - End a transaction (commit/abort based on transaction type)
+user:b(Txn, lmdbEnd, []) :-
     lmdbend(Txn).
 
 % Triple insertion and querying predicates
@@ -45,67 +43,67 @@ user:b(Txn, lmdbQuery, p(S, P, O)) :-
 :- begin_tests(lmdb_builtins).
 
 test(transaction_lifecycle) :-
-    b(lmdb, readWriteStart, WriteTxn),
+    b(WriteTxn, lmdbStartRW, "./test_db"),
     b(WriteTxn, lmdbInsert, p(alice, likes, bob)),
     b(WriteTxn, lmdbInsert, p(bob, likes, charlie)),
-    b(lmdb, end, WriteTxn),
+    b(WriteTxn, lmdbEnd, []),
     
-    b(lmdb, readStart, ReadTxn),
+    b(ReadTxn, lmdbStartR, "./test_db"),
     b(ReadTxn, lmdbQuery, p(alice, likes, X)),
     X = bob,
     b(ReadTxn, lmdbQuery, p(Y, likes, charlie)),
     Y = bob,
-    b(lmdb, end, ReadTxn).
+    b(ReadTxn, lmdbEnd, []).
 
 test(multiple_triple_insert) :-
-    b(lmdb, readWriteStart, WriteTxn),
+    b(WriteTxn, lmdbStartRW, "./test_db"),
     b(WriteTxn, lmdbInsert, p(user1, name, "Alice")),
     b(WriteTxn, lmdbInsert, p(user1, age, 30)),
     b(WriteTxn, lmdbInsert, p(user1, city, "NYC")),
-    b(lmdb, end, WriteTxn),
+    b(WriteTxn, lmdbEnd, []),
     
-    b(lmdb, readStart, ReadTxn),
+    b(ReadTxn, lmdbStartR, "./test_db"),
     b(ReadTxn, lmdbQuery, p(user1, name, Name)),
     Name = "Alice",
     b(ReadTxn, lmdbQuery, p(user1, age, Age)),
     Age = 30,
-    b(lmdb, end, ReadTxn).
+    b(ReadTxn, lmdbEnd, []).
 
 test(variable_pattern_query) :-
-    b(lmdb, readWriteStart, WriteTxn),
+    b(WriteTxn, lmdbStartRW, "./test_db"),
     b(WriteTxn, lmdbInsert, p(item1, type, weapon)),
     b(WriteTxn, lmdbInsert, p(item2, type, armor)),
     b(WriteTxn, lmdbInsert, p(item3, type, weapon)),
-    b(lmdb, end, WriteTxn),
+    b(WriteTxn, lmdbEnd, []),
     
-    b(lmdb, readStart, ReadTxn),
+    b(ReadTxn, lmdbStartR, "./test_db"),
     findall(Item, b(ReadTxn, lmdbQuery, p(Item, type, weapon)), Weapons),
     length(Weapons, WeaponCount),
     WeaponCount >= 2,
-    b(lmdb, end, ReadTxn).
+    b(ReadTxn, lmdbEnd, []).
 
 test(read_only_transaction) :-
     % Insert some test data first
-    b(lmdb, readWriteStart, WriteTxn),
+    b(WriteTxn, lmdbStartRW, "./test_db"),
     b(WriteTxn, lmdbInsert, p(test, readonly, value)),
-    b(lmdb, end, WriteTxn),
+    b(WriteTxn, lmdbEnd, []),
     
     % Test read-only access
-    b(lmdb, readStart, ReadTxn),
+    b(ReadTxn, lmdbStartR, "./test_db"),
     b(ReadTxn, lmdbQuery, p(test, readonly, Result)),
     Result = value,
-    b(lmdb, end, ReadTxn).
+    b(ReadTxn, lmdbEnd, []).
 
 test(complex_graph_traversal) :-
     % Set up a small graph
-    b(lmdb, readWriteStart, WriteTxn),
+    b(WriteTxn, lmdbStartRW, "./test_db"),
     b(WriteTxn, lmdbInsert, p(a, follows, b)),
     b(WriteTxn, lmdbInsert, p(b, follows, c)),
     b(WriteTxn, lmdbInsert, p(c, popularity, 100)),
-    b(lmdb, end, WriteTxn),
+    b(WriteTxn, lmdbEnd, []),
     
     % Query the graph
-    b(lmdb, readStart, ReadTxn),
+    b(ReadTxn, lmdbStartR, "./test_db"),
     
     % Find who 'a' follows
     b(ReadTxn, lmdbQuery, p(a, follows, FirstTarget)),
@@ -119,14 +117,14 @@ test(complex_graph_traversal) :-
     b(ReadTxn, lmdbQuery, p(SecondTarget, popularity, Pop)),
     Pop = 100,
     
-    b(lmdb, end, ReadTxn).
+    b(ReadTxn, lmdbEnd, []).
 
 test(f3_style_rule_with_findall) :-
     % Define a rule similar to what F3 generates
     assertz((result_inserted(ok) :-
-        b(lmdb, readWriteStart, Txn),
+        b(Txn, lmdbStartRW, "./test_db"),
         b(Txn, lmdbInsert, p(alice, likes, programming)),
-        b(lmdb, end, Txn)
+        b(Txn, lmdbEnd, [])
     )),
     
     % Use findall like F3's system query does
@@ -138,15 +136,15 @@ test(f3_style_rule_with_findall) :-
 
 test(f3_style_query_rule_with_findall) :-
     % First insert some data
-    b(lmdb, readWriteStart, WriteTxn),
+    b(WriteTxn, lmdbStartRW, "./test_db"),
     b(WriteTxn, lmdbInsert, p(alice, likes, programming)),
-    b(lmdb, end, WriteTxn),
+    b(WriteTxn, lmdbEnd, []),
     
     % Define a rule that queries (like F3 generates)
     assertz((result_found(X) :-
-        b(lmdb, readStart, ReadTxn),
+        b(ReadTxn, lmdbStartR, "./test_db"),
         b(ReadTxn, lmdbQuery, p(alice, likes, X)),
-        b(lmdb, end, ReadTxn)
+        b(ReadTxn, lmdbEnd, [])
     )),
     
     % Use findall to query it

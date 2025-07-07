@@ -2,20 +2,20 @@
 
 // Rule that inserts data and then queries it
 (
-    lmdb readWriteStart ?WriteTxn.
+    ?WriteTxn lmdbStartRW "./lmdb_data".
     ?WriteTxn lmdbInsert {
         alice age 25; likes programming.
         bob age 30; likes math.
         
     }.
-    lmdb end ?WriteTxn.
+    ?WriteTxn lmdbEnd [].
 ) => (
     result inserted [alice bob].
 ).
 (    
-    lmdb readStart ?ReadTxn.
+    ?ReadTxn lmdbStartR "./lmdb_data".
     ?ReadTxn lmdbQuery { ?Person likes ?Subject. }.
-    lmdb end ?ReadTxn.
+    ?ReadTxn lmdbEnd [].
 ) => (
     result found [?Person ?Subject].
 ).
