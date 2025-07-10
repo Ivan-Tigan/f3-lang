@@ -20,17 +20,8 @@
 :- dynamic p/3.
 :- multifile p/3.
 
-:- multifile user:b/3.
-:- dynamic b/3.
-:- multifile user:builtin/1.
-:- dynamic builtin/1.
-:- discontiguous b/3.
-:- discontiguous builtin/1.
-
-
 :- dynamic f3_loaded/1.
 
-% :- table b/3 as subsumptive.
 
 load(DB) :-
     (loaded(DB) -> 
@@ -40,45 +31,24 @@ load(DB) :-
     ).
 
 
-% Builtins
-builtin(=).
-builtin(>).
-builtin(<).
-builtin(>=).
-builtin(<=).
-builtin(sconcat).
-builtin(collect).
-builtin(sha256). 
-builtin([Index]) :- number(Index), !.
-builtin(hasGraph).
-% builtin([X, >>, Y]). % Now handled by pipe.pl
-builtin(replaceQuotes).
-builtin(lconcat).
-builtin(not).
-builtin(log).
-builtin(neq).
-builtin(iter).
-builtin([splitString, Separator]). 
-builtin(toString).
-builtin([reverse, Pred]).
 
-b(A, =, B) :- A = B.
-b(A, neq, B) :- b(system, log, ["QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ", test, A, not, equal, to, B]), A \= B.
-b(A, >, B) :- A > B.
-b(A, <, B) :- A < B.
-b(A, >=, B) :- A >= B.
-b(A, =<, B) :- A =< B.
-b(system, log, X) :- node_string(X, S),!, format(user_error, "~w~n", [S]).
-b(system, log, X) :- format(user_error, "~q~n", [X]), !.
-b(X, toString, S) :- node_string(X, S).
+p(A, =, B) :- A = B.
+p(A, neq, B) :- p(system, log, ["QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ", test, A, not, equal, to, B]), A \= B.
+p(A, >, B) :- A > B.
+p(A, <, B) :- A < B.
+p(A, >=, B) :- A >= B.
+p(A, =<, B) :- A =< B.
+p(system, log, X) :- node_string(X, S),!, format(user_error, "~w~n", [S]).
+p(system, log, X) :- format(user_error, "~q~n", [X]), !.
+p(X, toString, S) :- node_string(X, S).
 % Iter builtin to match each element of a list
-b(List, iter, Element) :- 
+p(List, iter, Element) :- 
     is_list(List),
     member(Element, List).
 
-b(system, not, p(A,B,C)) :- \+ p(A,B,C).
-b(XS, sconcat, Res) :- atomics_to_string(XS, Res) .
-b(S, [splitString, Separator], Res) :- 
+p(system, not, p(A,B,C)) :- \+ p(A,B,C).
+p(XS, sconcat, Res) :- atomics_to_string(XS, Res) .
+p(S, [splitString, Separator], Res) :- 
    atom_string(S, SStr),
    format(user_error, "ZZZZZZZZZZZZZZZZZZZZ Splitting string: ~q with separator: ~q~n", [SStr, Separator]),
     split_string(SStr, Separator, "", Res),
@@ -86,43 +56,36 @@ b(S, [splitString, Separator], Res) :-
    format(user_error, "ZZZZZZZZZZZZZZZZZZZZ split success: ~q~n", [Res])
     .  
 
-b(X, [reverse, Pred], Y) :- 
-   builtin(Pred),
+p(X, [reverse, Pred], Y) :- 
+
    !,
-   b(Y, Pred, X).  
-b(X, [reverse, Pred], Y) :-
+   p(Y, Pred, X).  
+p(X, [reverse, Pred], Y) :-
    p(Y, Pred, X), !.  
    
-b([Xs, Ys], lconcat, Res) :- 
+p([Xs, Ys], lconcat, Res) :- 
    append(Xs, Ys, Res).
-b(Xs, [Index], Element) :- 
+p(Xs, [Index], Element) :- 
     number(Index),
     !,
     nth0(Index, Xs, Element).
-b(X, replaceQuotes, Y) :-
+p(X, replaceQuotes, Y) :-
    replace_substring(X, "'", "\"", Res).
    
-b([Path, graph(G)], collect, Results) :-
+p([Path, graph(G)], collect, Results) :-
     % Convert graph pattern to conjunction
     list_to_conjunction(G, Conjunction),
     % Collect first argument from each triple that matches the pattern
     findall(Path, Conjunction, Results).
-% Old >> implementation now handled by pipe.pl
-% b(A, [X, >>, Y], B) :- builtin(X), builtin(Y), !, b(A, X, C), b(C, Y, B) .
-% b(A, [X, >>, Y], B) :- builtin(X), !, b(A, X, C), p(C, Y, B) .
-% b(A, [X, >>, Y], B) :- builtin(Y), !, p(A, X, C), b(C, Y, B) .
-% b(A, [X, >>, Y], B) :- p(A, X, C), p(C, Y, B) .
 
 
 
-% b(Input, sha256, Hash) :-
-%     atomic(Input),
-%     crypto_data_hash(Input, Hash, [algorithm(sha256), encoding(hex)]).
-b(Input, sha256, Hash) :-
+
+p(Input, sha256, Hash) :-
     atomic(Input),
     term_string(Input, InputString),  % Convert input to string
     crypto_data_hash(InputString, Hash, [algorithm(sha256), encoding(octet)]).
-b([db, DBPath], hasGraph, P) :-
+p([db, DBPath], hasGraph, P) :-
    full_db_path(DBPath, FullPath),
     load(FullPath),
     p([db, DBPath], hasGraph, P).
@@ -228,10 +191,7 @@ process_rule(p(graph(G1), =>, graph(G2)), Stream) :-
 
 transform_condition(p(system,cut,[]), !) :- !. 
 transform_condition(p(system,fail,[]), fail) :- !. 
-% Convert a single condition to the right form (b/3 or p/3)
-transform_condition(p(S,P,O), b(S,P,O)) :- 
-   builtin(P),
-   !.
+
 transform_condition(p(S,P,O), p(S,P,O)).
 
 % Convert list of conditions to conjunction, transforming builtins
@@ -251,7 +211,7 @@ build_rule(Head, ConditionsList, Rule) :-
 query(Pattern) :-
    findall(Pattern, 
            (p(S,P,O),
-            \+ builtin(P),
+
             \+ P = '=>',  % Skip implications
             Pattern = p(S,P,O)),
            Facts),
@@ -339,11 +299,11 @@ consult_f3_file_with_base(F, BaseDir) :-
 
    % Try F3_HOME env first, then SNAP, then fallback to local
    (getenv('F3_HOME', Home) -> 
-      b([Home, "/f3p ", ResolvedFile], sconcat, Cmd)
+      p([Home, "/f3p ", ResolvedFile], sconcat, Cmd)
    ; getenv('SNAP', Snap) -> 
-      b([Snap, "/bin/f3p ", ResolvedFile], sconcat, Cmd)
+      p([Snap, "/bin/f3p ", ResolvedFile], sconcat, Cmd)
    ;   
-      b(["./f3p ", ResolvedFile], sconcat, Cmd)
+      p(["./f3p ", ResolvedFile], sconcat, Cmd)
    ),
    run_command(Cmd, Program),
    consult_string(Program),
@@ -367,8 +327,9 @@ main([Arg1, Arg2]) :-
    tmp_file_stream(text, File, Stream),
    % format("Created temporary file: ~w~n", [File]),
    write(Stream, ':- dynamic p/3.\n\n'),
-
-   forall(p(A,B,C),
+   % listing(p),
+   forall(clause(p(A, B, C), true),
+      (retract(p(A, B, C)),  % Remove from memory to avoid duplicates
       (p(A,B,C) = p(graph(G1), => ,graph(G2)) -> 
          forall(member(M, G2), (
                build_rule(M, G1, Rule),
@@ -377,12 +338,12 @@ main([Arg1, Arg2]) :-
                format(Stream, '~q.~n', [Rule])
             ))
       ; format(Stream, '~q.~n', [p(A,B,C)])
-      )),
+      ))),
    close(Stream),
-   retractall(p(_,_,_)),  % Clear all p/3 facts to avoid duplicates
+   % retractall(p(_,_,_)),  % Clear all p/3 facts to avoid duplicates
    % Read and print the file contents
    read_file_to_string(File, Contents, []),
-   % format("Generated facts and rules:~n~w~n", [Contents]),
+   format("Generated facts and rules:~n~w~n", [Contents]),
    % load_files(File, [dynamic(true)]).  % Use load_files with dynamic option
 
    consult(File),

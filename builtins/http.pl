@@ -10,8 +10,8 @@
 % Set test options to show output
 :- set_test_options([silent(false)]).
 
-:- multifile user:b/3.
-:- multifile user:builtin/1.
+
+:- multifile user:p/3.
 
 :- use_module(cache).
 
@@ -63,9 +63,9 @@ json_field_to_graph(Name=Value, p(Name,=,ValueString)) :-
     atom_string(Value, ValueString).
 json_field_to_graph(Name=Value, p(Name,=,Value)).
 
-user:builtin(fetch).
+
 % Main predicate to handle HTTP requests with caching
-user:b(Request, fetch, Response) :-
+user:p(Request, fetch, Response) :-
     % Extract components from Request
     Request = graph(RequestProps),
     memberchk(p(_, url, BaseURL), RequestProps),
@@ -154,7 +154,7 @@ test(post_request_nested) :-
             p("X-Custom-Header",=,"test-value")
         ]))
     ]),
-    b(Request, fetch, Response),
+    p(Request, fetch, Response),
     Response = graph([
         p(response, headers, _),
         p(response, body, ResponseBody)
@@ -183,7 +183,7 @@ test(get_request) :-
         ]))
     ]),
  format('~n~nRequest:~n~w~n~n', [Request]),
-    b(Request, fetch, Response),
+    p(Request, fetch, Response),
     format('~nResponse:~n~w~n~n', [Response]),
 
     Response = graph([
@@ -211,7 +211,7 @@ test(post_form_request) :-
         ]))
     ]),
     format('~n~nForm POST Request:~n~w~n~n', [Request]),
-    b(Request, fetch, Response),
+    p(Request, fetch, Response),
     format('~nForm POST Response:~n~w~n~n', [Response]),
     Response = graph([
         p(response, headers, _),

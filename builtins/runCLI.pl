@@ -6,19 +6,18 @@
 
 :- debug(log).
 
-:- multifile user:b/3.
-:- multifile user:builtin/1.
+:- multifile user:p/3.
 
 % Set test options to show output
 :- set_test_options([silent(false)]).
 
 :- use_module(cache).
 
-user:builtin(runCLI).
+
 % Main predicate to handle command execution with caching
-user:b(Input, runCLI, Output) :-
+user:p(Input, runCLI, Output) :-
     access_cache(Input, runCLI, Output), !.
-user:b([CmdId, CmdString, StdIn], runCLI, Output) :-
+user:p([CmdId, CmdString, StdIn], runCLI, Output) :-
     % Execute command through bash and capture output
     setup_call_cleanup(
         process_create(path(bash), ['-c', CmdString], 
@@ -42,14 +41,14 @@ user:b([CmdId, CmdString, StdIn], runCLI, Output) :-
 % Tests
 :- begin_tests(run_cli).
 test(echo_command) :-
-    b([1, "echo 'Hello World'", ""], runCLI, [Stdout, ""]),
+    p([1, "echo 'Hello World'", ""], runCLI, [Stdout, ""]),
     sub_string(Stdout, _, _, _, "Hello World"), !.
 
 test(cat_with_stdin) :-
-    b([2, "cat", "test input"], runCLI, ["test input", ""]).
+    p([2, "cat", "test input"], runCLI, ["test input", ""]).
 
 test(grep_with_stdin) :-
-    b([3, "grep hello", "hello world\nhi there\nhello again\n"], runCLI, 
+    p([3, "grep hello", "hello world\nhi there\nhello again\n"], runCLI, 
       ["hello world\nhello again\n", ""]).
 
 :- end_tests(run_cli).

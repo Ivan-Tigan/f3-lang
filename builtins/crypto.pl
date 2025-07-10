@@ -3,17 +3,17 @@
 :- use_module(library(crypto)).
 :- use_module(library(plunit)).
 
-:- multifile user:b/3.
-:- multifile user:builtin/1.
+
+:- multifile user:p/3.
 
 % Set test options to show output
 :- set_test_options([silent(false)]).
 
-user:builtin([encrypt, _]).
-user:builtin([decrypt, _]).
+
+
 
 % Symmetric encryption using ChaCha20-Poly1305
-user:b(PlainText, [encrypt, Secret], CipherText) :-
+user:p(PlainText, [encrypt, Secret], CipherText) :-
     % Use ChaCha20-Poly1305 authenticated encryption
     Algorithm = 'chacha20-poly1305',
     % Derive key from secret (32 bytes for ChaCha20)
@@ -33,7 +33,7 @@ user:b(PlainText, [encrypt, Secret], CipherText) :-
     CipherText = CipherHex.
 
 % Symmetric decryption using ChaCha20-Poly1305  
-user:b(CipherText, [decrypt, Secret], PlainText) :-
+user:p(CipherText, [decrypt, Secret], PlainText) :-
     % Use ChaCha20-Poly1305 authenticated encryption
     Algorithm = 'chacha20-poly1305',
     format(user_error, 'YYYYYYYYYYYYYY decrypt: ~w ~n', [Secret]),
@@ -56,44 +56,44 @@ user:b(CipherText, [decrypt, Secret], PlainText) :-
 test(encrypt_decrypt_simple) :-
     PlainText = "Hello, World!",
     Secret = "my_secret_key",
-    b(PlainText, [encrypt, Secret], CipherText),
-    b(CipherText, [decrypt, Secret], DecryptedText),
+    p(PlainText, [encrypt, Secret], CipherText),
+    p(CipherText, [decrypt, Secret], DecryptedText),
     PlainText = DecryptedText.
 
 test(encrypt_decrypt_empty) :-
     PlainText = "",
     Secret = "another_secret",
-    b(PlainText, [encrypt, Secret], CipherText),
-    b(CipherText, [decrypt, Secret], DecryptedText),
+    p(PlainText, [encrypt, Secret], CipherText),
+    p(CipherText, [decrypt, Secret], DecryptedText),
     PlainText = DecryptedText.
 
 test(encrypt_decrypt_long_text) :-
     PlainText = "This is a much longer piece of text that should still encrypt and decrypt correctly using the ChaCha20-Poly1305 authenticated encryption algorithm.",
     Secret = "very_secure_secret_key_123",
-    b(PlainText, [encrypt, Secret], CipherText),
-    b(CipherText, [decrypt, Secret], DecryptedText),
+    p(PlainText, [encrypt, Secret], CipherText),
+    p(CipherText, [decrypt, Secret], DecryptedText),
     PlainText = DecryptedText.
 
 test(different_secrets_fail) :-
     PlainText = "Secret message",
     Secret1 = "secret1",
     Secret2 = "secret2", 
-    b(PlainText, [encrypt, Secret1], CipherText),
+    p(PlainText, [encrypt, Secret1], CipherText),
     % Should fail with wrong secret (catch SSL error)
-    \+ catch(b(CipherText, [decrypt, Secret2], _), _, fail).
+    \+ catch(p(CipherText, [decrypt, Secret2], _), _, fail).
 
 test(encryption_is_randomized) :-
     PlainText = "Same message",
     Secret = "same_secret",
-    b(PlainText, [encrypt, Secret], CipherText1),
-    b(PlainText, [encrypt, Secret], CipherText2),
+    p(PlainText, [encrypt, Secret], CipherText1),
+    p(PlainText, [encrypt, Secret], CipherText2),
     % Should produce different ciphertexts due to random IV
     CipherText1 \= CipherText2.
 
 test(ciphertext_is_hex) :-
     PlainText = "Test message",
     Secret = "test_secret",
-    b(PlainText, [encrypt, Secret], CipherText),
+    p(PlainText, [encrypt, Secret], CipherText),
     % Should be valid hex string
     hex_bytes(CipherText, _Bytes).
 

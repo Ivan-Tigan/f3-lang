@@ -4,21 +4,16 @@
 :- use_module(library(plunit)).
 :- use_module(library(pcre)).
 
-:- multifile user:b/3.
-:- multifile user:builtin/1.
+:- multifile user:p/3.
 
 % Set test options to show output
 :- set_test_options([silent(false)]).
-
-user:builtin(base64).
-user:builtin(base64Url).
-
 % Bidirectional standard base64 encoding/decoding
-user:b(Plain, base64, Encoded) :-
+user:p(Plain, base64, Encoded) :-
     base64(Plain, Encoded).
 
 % Bidirectional base64URL encoding/decoding (used by JWT)
-user:b(Plain, base64Url, Encoded) :-
+user:p(Plain, base64Url, Encoded) :-
     var(Plain), nonvar(Encoded), !,
     % Decoding: convert base64url to base64, then decode
     atom_string(Encoded, EncodedStr),
@@ -35,7 +30,7 @@ user:b(Plain, base64Url, Encoded) :-
     ),
     base64(Plain, Base64).
 
-user:b(Plain, base64Url, Encoded) :-
+user:p(Plain, base64Url, Encoded) :-
     nonvar(Plain), var(Encoded), !,
     % Encoding: encode to base64, then convert to base64url
     base64(Plain, Base64),
@@ -48,41 +43,41 @@ user:b(Plain, base64Url, Encoded) :-
 :- begin_tests(base64_builtin).
 
 test(base64_encode) :-
-    b('Hello World', base64, Encoded),
+    p('Hello World', base64, Encoded),
     Encoded = 'SGVsbG8gV29ybGQ='.
 
 test(base64_decode) :-
-    b(Plain, base64, 'SGVsbG8gV29ybGQ='),
+    p(Plain, base64, 'SGVsbG8gV29ybGQ='),
     Plain = 'Hello World'.
 
 test(base64_bidirectional) :-
     TestString = 'Test string for encoding',
-    b(TestString, base64, Encoded),
-    b(Decoded, base64, Encoded),
+    p(TestString, base64, Encoded),
+    p(Decoded, base64, Encoded),
     TestString = Decoded.
 
 test(base64url_encode) :-
-    b('Hello World', base64Url, Encoded),
+    p('Hello World', base64Url, Encoded),
     % base64url should use URL-safe chars (no + or /)
     \+ sub_atom(Encoded, _, _, _, '+'),
     \+ sub_atom(Encoded, _, _, _, '/').
 
 test(base64url_decode) :-
     % Test with a known base64url string
-    b('Hello World', base64Url, Encoded),
-    b(Decoded, base64Url, Encoded),
+    p('Hello World', base64Url, Encoded),
+    p(Decoded, base64Url, Encoded),
     Decoded = 'Hello World'.
 
 test(base64url_bidirectional) :-
     TestString = 'JWT payload test string',
-    b(TestString, base64Url, Encoded),
-    b(Decoded, base64Url, Encoded),
+    p(TestString, base64Url, Encoded),
+    p(Decoded, base64Url, Encoded),
     TestString = Decoded.
 
 test(jwt_payload_decode) :-
     % Real JWT payload from Logto
     JwtPayload = 'eyJzdWIiOiJzdTEwNnk3bTZoeWwiLCJuYW1lIjoiSXZhbiBUc29uaW5za2kiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jSVhQcHF2RkhpZklXczJSS0pEOXR6UDg0QVNCRDByZUZNTkx3b1hiSHNHVDNaallRPXM5Ni1jIiwidXBkYXRlZF9hdCI6MTc1MTUzNzg2MDc5MSwidXNlcm5hbWUiOiJJdmFuIiwiY3JlYXRlZF9hdCI6MTc0MDAwNTY1ODY4MiwiZW1haWwiOiJpdmFudHNvbmluc2tpQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJhdXRoX3RpbWUiOjE3NTE1Mzc4NjAsImF0X2hhc2giOiJYLWZITVU3MTAtWDJ3Q3dPRno0QXh5YW5jb0luSm1OMiIsImF1ZCI6IjB4ZHJqZ25mdmpkcG43d2ZnczF6MiIsImV4cCI6MTc1MTU0MTQ2MSwiaWF0IjoxNzUxNTM3ODYxLCJpc3MiOiJodHRwczovL2xvZ3RvLmYzd2ViLmFwcC9vaWRjIn0',
-    b(Decoded, base64Url, JwtPayload),
+    p(Decoded, base64Url, JwtPayload),
     % Should decode to JSON string containing user info
     sub_atom(Decoded, _, _, _, 'Ivan Tsoninski'),
     sub_atom(Decoded, _, _, _, 'ivantsoninski@gmail.com').

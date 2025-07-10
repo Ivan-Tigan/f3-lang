@@ -1,13 +1,12 @@
 :- module(match, []).
 
-:- multifile user:b/3.
-:- multifile user:builtin/1.
+:- multifile user:p/3.
 :- multifile p/3.
 
-user:builtin(match).
+
 
 % Main pattern matching predicate 
-user:b(graph(Facts), match, graph(PatternTriples)) :-
+user:p(graph(Facts), match, graph(PatternTriples)) :-
     % format(user_error, "Matching facts ~q against pattern ~q~n", [Facts, PatternTriples]),
     match_triples(Facts, PatternTriples),
     % format(user_error, "Match successful~n", []),
@@ -60,18 +59,18 @@ unify_terms(Pattern, Pattern).
 test(simple_match) :-
     Facts = [p(a, b, c)],
     Pattern = [p(X, Y, Z)],
-    b(graph(Facts), match, graph(Pattern)),
+    p(graph(Facts), match, graph(Pattern)),
     X = a, Y = b, Z = c.
 
 test(predicate_match) :-
     Facts = [p(a, equals, c)],
     Pattern = [p(_, equals, c)],
-    b(graph(Facts), match, graph(Pattern)).
+    p(graph(Facts), match, graph(Pattern)).
 
 test(nested_match) :-
     Facts = [p(a, has, graph([p(x, y, z)]))],
     Pattern = [p(_, has, graph([p(X, y, z)]))],
-    b(graph(Facts), match, graph(Pattern)),
+    p(graph(Facts), match, graph(Pattern)),
     X = x.
 
 test(deep_variable_binding) :-
@@ -85,7 +84,7 @@ test(deep_variable_binding) :-
         ]))
     ],
     Pattern = [p(person, data, Data)],
-    b(graph(Facts), match, graph(Pattern)),
+    p(graph(Facts), match, graph(Pattern)),
     Data = graph([
         p(name, =, "Alice"),
         p(age, =, 30),
@@ -101,7 +100,7 @@ test(multiple_matches) :-
         p(c, type, y)
     ],
     Pattern = [p(Name, type, x)],
-    b(graph(Facts), match, graph(Pattern)),
+    p(graph(Facts), match, graph(Pattern)),
     memberchk(Name, [a,b]).
 
 :- end_tests(match).

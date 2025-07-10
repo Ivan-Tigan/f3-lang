@@ -149,7 +149,7 @@ handle_method(post, Request) :-
     % append(BaseFacts, WrappedJSONFacts, Facts),
     Facts = BaseFacts,
     format(user_error, "Facts to assert: ~q ~n", [Facts]),
-    % b(JSONGraph, query, graph([ p(U, user, Name), p(U, taskName, T)])),
+    % p(JSONGraph, query, graph([ p(U, user, Name), p(U, taskName, T)])),
     % format(user_error, "Query facts ~q ~q ~q:~n", [U, Name, T]),
     forall(member(Fact, Facts), asserta(Fact)),
     format(user_error, "Query mutations ~w:~n", [Guid]),
@@ -191,7 +191,7 @@ forall(p(DB, delete, Pattern),
 uuid(Guid) :-
     get_time(Now),
     format(atom(Id), 'post_~w', [Now]),
-    b(Id, sha256, G),
+    p(Id, sha256, G),
     sub_string(G, 0, 6, _, Guid).
 % :- initialization(main, main).
 

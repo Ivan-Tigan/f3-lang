@@ -2,17 +2,16 @@
 
 :- use_module(library(plunit)).
 
-:- multifile user:b/3.
-:- multifile user:builtin/1.
+:- multifile user:p/3.
 
 % Set test options to show output
 :- set_test_options([silent(false)]).
 
 % Traditional two-element pipe [A >> B]
-user:builtin([X, >>, Y]).
+
 
 % Multi-element pipe chains [A >> B >> C >> D >> ...]
-user:builtin(Chain) :- 
+:- 
     is_list(Chain),
     length(Chain, Len),
     Len >= 5,  % At least [A >> B >> C]
@@ -25,12 +24,12 @@ is_pipe_chain([_, >>, Rest|Tail]) :-
     is_pipe_chain([Rest|Tail]).
 
 % Handle traditional two-element pipes [A >> B]
-user:b(A, [X, >>, Y], B) :- 
+user:p(A, [X, >>, Y], B) :- 
     apply_pipe_step(A, X, C),
     apply_pipe_step(C, Y, B).
 
 % Handle multi-element pipe chains [A >> B >> C >> D >> ...]
-user:b(A, Chain, B) :-
+user:p(A, Chain, B) :-
     is_list(Chain),
     length(Chain, Len),
     Len >= 5,
@@ -49,8 +48,8 @@ apply_pipe_chain(Input, [FirstOp, >>, SecondOp | Rest], Output) :-
 
 % Apply a single pipe step (operation)
 apply_pipe_step(Input, Operation, Output) :-
-    user:builtin(Operation), !,
-    user:b(Input, Operation, Output).
+ !,
+    user:p(Input, Operation, Output).
 
 apply_pipe_step(Input, Operation, Output) :-
     user:p(Input, Operation, Output).
@@ -61,25 +60,25 @@ apply_pipe_step(Input, Operation, Output) :-
 test(simple_two_pipe) :-
     % Test [lconcat >> [0]] - concatenate lists then get first element (0-based)
     Input = [["a", "b"], ["c", "d"]],
-    b(Input, [lconcat, >>, [0]], Output),
+    p(Input, [lconcat, >>, [0]], Output),
     Output = "a".
 
 test(three_pipe_chain) :-
     % Test [A >> B >> C] 
     Input = [["hello"], ["world"]],
-    b(Input, [lconcat, >>, sconcat, >>, [0]], Output),
+    p(Input, [lconcat, >>, sconcat, >>, [0]], Output),
     Output = 104.  % Character code for 'h'
 
 test(four_pipe_chain) :-
     % Test [A >> B >> C >> D]
     Input = [["hello"], ["world"]],
-    b(Input, [lconcat, >>, sconcat, >>, [splitString, "e"], >>, [1]], Output),
+    p(Input, [lconcat, >>, sconcat, >>, [splitString, "e"], >>, [1]], Output),
     Output = "lloworld".
 
 test(five_pipe_chain) :-
     % Test [A >> B >> C >> D >> E] - even longer chain
     Input = [["abc"], ["def"]],
-    b(Input, [lconcat, >>, sconcat, >>, [splitString, "c"], >>, [1], >>, [0]], Output),
+    p(Input, [lconcat, >>, sconcat, >>, [splitString, "c"], >>, [1], >>, [0]], Output),
     Output = 100.  % Character code for 'd'
 
 :- end_tests(pipe_builtin).

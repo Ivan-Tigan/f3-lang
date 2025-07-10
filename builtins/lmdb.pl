@@ -3,134 +3,133 @@
 :- use_module('../lmdb/src/transactional_triple').
 :- use_module(library(plunit)).
 
-:- multifile user:b/3.
-:- multifile user:builtin/1.
+:- multifile user:p/3.
 
 % Register builtins
-user:builtin(lmdbStartR).
-user:builtin(lmdbStartRW).
-user:builtin(lmdbEnd).
-user:builtin(lmdbInsert).
-user:builtin(lmdbQuery).
-user:builtin(lmdbDelete).
+
+
+
+
+
+
 
 % Transaction management predicates
 
 % Txn lmdbStartR "path" - Start a read-only transaction with custom path
-user:b(Txn, lmdbStartR, Path) :-
+user:p(Txn, lmdbStartR, Path) :-
     lmdbstart(Txn, read, Path).
 
 % Txn lmdbStartRW "path" - Start a read-write transaction with custom path
-user:b(Txn, lmdbStartRW, Path) :-
+user:p(Txn, lmdbStartRW, Path) :-
     lmdbstart(Txn, write, Path).
 
 % Txn lmdbEnd [] - End a transaction (commit/abort based on transaction type)
-user:b(Txn, lmdbEnd, []) :-
+user:p(Txn, lmdbEnd, []) :-
     lmdbend(Txn).
 
 % Triple insertion and querying predicates
 
 % Txn lmdbInsert p(S, P, O) - Insert a triple into the database
 % The F3 syntax "Txn lmdbInsert { S P O. }" gets parsed into this
-user:b(Txn, lmdbInsert, p(S, P, O)) :-
+user:p(Txn, lmdbInsert, p(S, P, O)) :-
     lmdbinsert(Txn, S, P, O).
 
 % Txn lmdbQuery p(S, P, O) - Query triples from the database  
 % The F3 syntax "Txn lmdbQuery { S P O. }" gets parsed into this
-user:b(Txn, lmdbQuery, p(S, P, O)) :-
+user:p(Txn, lmdbQuery, p(S, P, O)) :-
     lmdbquery(Txn, S, P, O).
 
 % Txn lmdbDelete p(S, P, O) - Delete a triple from the database
 % The F3 syntax "Txn lmdbDelete { S P O. }" gets parsed into this
-user:b(Txn, lmdbDelete, p(S, P, O)) :-
+user:p(Txn, lmdbDelete, p(S, P, O)) :-
     lmdbdelete(Txn, S, P, O).
 
 % Tests
 :- begin_tests(lmdb_builtins).
 
 test(transaction_lifecycle) :-
-    b(WriteTxn, lmdbStartRW, "./test_db"),
-    b(WriteTxn, lmdbInsert, p(alice, likes, bob)),
-    b(WriteTxn, lmdbInsert, p(bob, likes, charlie)),
-    b(WriteTxn, lmdbEnd, []),
+    p(WriteTxn, lmdbStartRW, "./test_db"),
+    p(WriteTxn, lmdbInsert, p(alice, likes, bob)),
+    p(WriteTxn, lmdbInsert, p(bob, likes, charlie)),
+    p(WriteTxn, lmdbEnd, []),
     
-    b(ReadTxn, lmdbStartR, "./test_db"),
-    b(ReadTxn, lmdbQuery, p(alice, likes, X)),
+    p(ReadTxn, lmdbStartR, "./test_db"),
+    p(ReadTxn, lmdbQuery, p(alice, likes, X)),
     X = bob,
-    b(ReadTxn, lmdbQuery, p(Y, likes, charlie)),
+    p(ReadTxn, lmdbQuery, p(Y, likes, charlie)),
     Y = bob,
-    b(ReadTxn, lmdbEnd, []).
+    p(ReadTxn, lmdbEnd, []).
 
 test(multiple_triple_insert) :-
-    b(WriteTxn, lmdbStartRW, "./test_db"),
-    b(WriteTxn, lmdbInsert, p(user1, name, "Alice")),
-    b(WriteTxn, lmdbInsert, p(user1, age, 30)),
-    b(WriteTxn, lmdbInsert, p(user1, city, "NYC")),
-    b(WriteTxn, lmdbEnd, []),
+    p(WriteTxn, lmdbStartRW, "./test_db"),
+    p(WriteTxn, lmdbInsert, p(user1, name, "Alice")),
+    p(WriteTxn, lmdbInsert, p(user1, age, 30)),
+    p(WriteTxn, lmdbInsert, p(user1, city, "NYC")),
+    p(WriteTxn, lmdbEnd, []),
     
-    b(ReadTxn, lmdbStartR, "./test_db"),
-    b(ReadTxn, lmdbQuery, p(user1, name, Name)),
+    p(ReadTxn, lmdbStartR, "./test_db"),
+    p(ReadTxn, lmdbQuery, p(user1, name, Name)),
     Name = "Alice",
-    b(ReadTxn, lmdbQuery, p(user1, age, Age)),
+    p(ReadTxn, lmdbQuery, p(user1, age, Age)),
     Age = 30,
-    b(ReadTxn, lmdbEnd, []).
+    p(ReadTxn, lmdbEnd, []).
 
 test(variable_pattern_query) :-
-    b(WriteTxn, lmdbStartRW, "./test_db"),
-    b(WriteTxn, lmdbInsert, p(item1, type, weapon)),
-    b(WriteTxn, lmdbInsert, p(item2, type, armor)),
-    b(WriteTxn, lmdbInsert, p(item3, type, weapon)),
-    b(WriteTxn, lmdbEnd, []),
+    p(WriteTxn, lmdbStartRW, "./test_db"),
+    p(WriteTxn, lmdbInsert, p(item1, type, weapon)),
+    p(WriteTxn, lmdbInsert, p(item2, type, armor)),
+    p(WriteTxn, lmdbInsert, p(item3, type, weapon)),
+    p(WriteTxn, lmdbEnd, []),
     
-    b(ReadTxn, lmdbStartR, "./test_db"),
-    findall(Item, b(ReadTxn, lmdbQuery, p(Item, type, weapon)), Weapons),
+    p(ReadTxn, lmdbStartR, "./test_db"),
+    findall(Item, p(ReadTxn, lmdbQuery, p(Item, type, weapon)), Weapons),
     length(Weapons, WeaponCount),
     WeaponCount >= 2,
-    b(ReadTxn, lmdbEnd, []).
+    p(ReadTxn, lmdbEnd, []).
 
 test(read_only_transaction) :-
     % Insert some test data first
-    b(WriteTxn, lmdbStartRW, "./test_db"),
-    b(WriteTxn, lmdbInsert, p(test, readonly, value)),
-    b(WriteTxn, lmdbEnd, []),
+    p(WriteTxn, lmdbStartRW, "./test_db"),
+    p(WriteTxn, lmdbInsert, p(test, readonly, value)),
+    p(WriteTxn, lmdbEnd, []),
     
     % Test read-only access
-    b(ReadTxn, lmdbStartR, "./test_db"),
-    b(ReadTxn, lmdbQuery, p(test, readonly, Result)),
+    p(ReadTxn, lmdbStartR, "./test_db"),
+    p(ReadTxn, lmdbQuery, p(test, readonly, Result)),
     Result = value,
-    b(ReadTxn, lmdbEnd, []).
+    p(ReadTxn, lmdbEnd, []).
 
 test(complex_graph_traversal) :-
     % Set up a small graph
-    b(WriteTxn, lmdbStartRW, "./test_db"),
-    b(WriteTxn, lmdbInsert, p(a, follows, b)),
-    b(WriteTxn, lmdbInsert, p(b, follows, c)),
-    b(WriteTxn, lmdbInsert, p(c, popularity, 100)),
-    b(WriteTxn, lmdbEnd, []),
+    p(WriteTxn, lmdbStartRW, "./test_db"),
+    p(WriteTxn, lmdbInsert, p(a, follows, b)),
+    p(WriteTxn, lmdbInsert, p(b, follows, c)),
+    p(WriteTxn, lmdbInsert, p(c, popularity, 100)),
+    p(WriteTxn, lmdbEnd, []),
     
     % Query the graph
-    b(ReadTxn, lmdbStartR, "./test_db"),
+    p(ReadTxn, lmdbStartR, "./test_db"),
     
     % Find who 'a' follows
-    b(ReadTxn, lmdbQuery, p(a, follows, FirstTarget)),
+    p(ReadTxn, lmdbQuery, p(a, follows, FirstTarget)),
     FirstTarget = b,
     
     % Find who that person follows
-    b(ReadTxn, lmdbQuery, p(FirstTarget, follows, SecondTarget)),
+    p(ReadTxn, lmdbQuery, p(FirstTarget, follows, SecondTarget)),
     SecondTarget = c,
     
     % Find their popularity
-    b(ReadTxn, lmdbQuery, p(SecondTarget, popularity, Pop)),
+    p(ReadTxn, lmdbQuery, p(SecondTarget, popularity, Pop)),
     Pop = 100,
     
-    b(ReadTxn, lmdbEnd, []).
+    p(ReadTxn, lmdbEnd, []).
 
 test(f3_style_rule_with_findall) :-
     % Define a rule similar to what F3 generates
     assertz((result_inserted(ok) :-
-        b(Txn, lmdbStartRW, "./test_db"),
-        b(Txn, lmdbInsert, p(alice, likes, programming)),
-        b(Txn, lmdbEnd, [])
+        p(Txn, lmdbStartRW, "./test_db"),
+        p(Txn, lmdbInsert, p(alice, likes, programming)),
+        p(Txn, lmdbEnd, [])
     )),
     
     % Use findall like F3's system query does
@@ -142,15 +141,15 @@ test(f3_style_rule_with_findall) :-
 
 test(f3_style_query_rule_with_findall) :-
     % First insert some data
-    b(WriteTxn, lmdbStartRW, "./test_db"),
-    b(WriteTxn, lmdbInsert, p(alice, likes, programming)),
-    b(WriteTxn, lmdbEnd, []),
+    p(WriteTxn, lmdbStartRW, "./test_db"),
+    p(WriteTxn, lmdbInsert, p(alice, likes, programming)),
+    p(WriteTxn, lmdbEnd, []),
     
     % Define a rule that queries (like F3 generates)
     assertz((result_found(X) :-
-        b(ReadTxn, lmdbStartR, "./test_db"),
-        b(ReadTxn, lmdbQuery, p(alice, likes, X)),
-        b(ReadTxn, lmdbEnd, [])
+        p(ReadTxn, lmdbStartR, "./test_db"),
+        p(ReadTxn, lmdbQuery, p(alice, likes, X)),
+        p(ReadTxn, lmdbEnd, [])
     )),
     
     % Use findall to query it

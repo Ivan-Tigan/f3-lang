@@ -5,11 +5,10 @@
 :- use_module(library(http/http_json)).
 :- use_module(library(http/json)).
 
-:- multifile user:b/3.
-:- multifile user:builtin/1.
+:- multifile user:p/3.
 
 % Register wsSend builtin
-user:builtin(wsSend).
+
 
 % Store active WebSocket connections
 :- dynamic ws_connection/4.  % ws_connection(ID, Path, Headers, WebSocket)
@@ -137,7 +136,7 @@ ws_receive_loop(ConnectionId, WebSocket) :-
     ).
 
 % wsSend builtin implementation
-user:b(Pattern, wsSend, Message) :-
+user:p(Pattern, wsSend, Message) :-
     format(user_error, "WebSocket send request: ~w -> ~w~n", [Pattern, Message]),
     
     % Find all matching connections
@@ -166,7 +165,7 @@ connection_matches_pattern(ID, Path, HeaderPairs, Pattern) :-
     
     % Use match builtin
     catch(
-        b(ConnectionGraph, match, Pattern),
+        p(ConnectionGraph, match, Pattern),
         Error,
         (format(user_error, "Match error: ~w~n", [Error]), fail)
     ).

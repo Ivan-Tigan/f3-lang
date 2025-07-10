@@ -3,22 +3,20 @@
 :- use_module(library(http/json)).
 :- use_module(library(plunit)).
 
-:- multifile user:b/3.
-:- multifile user:builtin/1.
-
 % Set test options to show output
 :- set_test_options([silent(false)]).
 
-user:builtin(parseJson).
-user:builtin(jsonToString).
+
+
+:- multifile user:p/3.
 
 % Convert JSON string to graph format (bidirectional)
-user:b(JsonString, parseJson, Graph) :-
+user:p(JsonString, parseJson, Graph) :-
     atom_json_term(JsonString, JsonTerm, [value_string_as(string)]),
     json_to_graph(JsonTerm, Graph).
 
 % Convert graph to JSON string (bidirectional)
-user:b(Graph, jsonToString, JsonString) :-
+user:p(Graph, jsonToString, JsonString) :-
     graph_to_json(Graph, JsonTerm),
     atom_json_term(JsonString, JsonTerm, [value_string_as(string)]).
 
@@ -51,12 +49,12 @@ graph_field_to_json(p(Name,=,Value), Name=Value).
 
 test(parse_simple_json) :-
     JsonString = '{"name": "John", "age": 30}',
-    b(JsonString, parseJson, Graph),
+    p(JsonString, parseJson, Graph),
     Graph = graph([p(name,=,"John"), p(age,=,30)]).
 
 test(parse_nested_json) :-
     JsonString = '{"user": {"name": "Alice", "age": 25}, "active": true}',
-    b(JsonString, parseJson, Graph),
+    p(JsonString, parseJson, Graph),
     Graph = graph([
         p(user,=,graph([p(name,=,"Alice"), p(age,=,25)])),
         p(active,=,true)
@@ -64,9 +62,9 @@ test(parse_nested_json) :-
 
 test(json_to_string_simple) :-
     Graph = graph([p(name,=,"Bob"), p(age,=,35)]),
-    b(Graph, jsonToString, JsonString),
+    p(Graph, jsonToString, JsonString),
     % Parse it back to verify it's valid JSON
-    b(JsonString, parseJson, ParsedBack),
+    p(JsonString, parseJson, ParsedBack),
     Graph = ParsedBack.
 
 test(json_to_string_nested) :-
@@ -74,15 +72,15 @@ test(json_to_string_nested) :-
         p(user,=,graph([p(name,=,"Carol"), p(email,=,"carol@example.com")])),
         p(status,=,"active")
     ]),
-    b(Graph, jsonToString, JsonString),
+    p(Graph, jsonToString, JsonString),
     % Parse it back to verify roundtrip
-    b(JsonString, parseJson, ParsedBack),
+    p(JsonString, parseJson, ParsedBack),
     Graph = ParsedBack.
 
 test(jwt_payload_example) :-
     % Real JWT payload example
     JwtPayload = '{"sub":"1234567890","name":"John Doe","iat":1516239022}',
-    b(JwtPayload, parseJson, Graph),
+    p(JwtPayload, parseJson, Graph),
     Graph = graph([
         p(sub,=,"1234567890"),
         p(name,=,"John Doe"), 
@@ -98,8 +96,8 @@ test(bidirectional_round_trip) :-
             p(preferences,=,graph([p(theme,=,"dark")]))
         ]))
     ]),
-    b(OriginalGraph, jsonToString, JsonString),
-    b(JsonString, parseJson, ParsedGraph),
+    p(OriginalGraph, jsonToString, JsonString),
+    p(JsonString, parseJson, ParsedGraph),
     OriginalGraph = ParsedGraph.
 
 :- end_tests(json_builtin).
