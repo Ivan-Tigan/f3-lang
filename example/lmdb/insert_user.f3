@@ -1,0 +1,13 @@
+(
+    ?WriteTxn 
+        lmdbStartRW "./user_data";
+        // lmdbInsert { "su106y7m6hyl" a User. };
+        // lmdbInsert { "su106y7m6hyl" name "Ivan Tsoninski".}; 
+        // lmdbInsert { "su106y7m6hyl" email "ivantsoninski@gmail.com". };
+        lmdbInsert { "su106y7m6hyl" a User; name "Ivan Tsoninski"; email "ivantsoninski@gmail.com". };
+        lmdbEnd [].
+) => (
+    result inserted ok.
+).
+// system debug listing.
+system query [ ?X ( result inserted ?X. ) ].

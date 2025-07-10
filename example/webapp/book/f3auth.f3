@@ -5,17 +5,25 @@
 ) => (
     ?R f3AuthSession ?F3AuthSessionInfo.
 ).
-(f3Auth callbackPath ?CallbackPath; appUrl ?AppUrl. [?AppUrl ?CallbackPath] sconcat ?CallbackURL.) => (f3Auth callbackUrl ?CallbackURL. ).
+
+
+// base/login stores tenant host -> /oidc/auth
 (
-    f3Auth loginPath ?LoginPath; callbackUrl ?CallbackURL.
-    ?R match ( ?RID a get; path ?LoginPath. ). ?RID sha256 ?StateHash.
-    ["f3auth_state=" ?StateHash "; HttpOnly; Secure; Path=/; Domain=.localhost; Max-Age=600"] sconcat ?F3Cookie.
+    f3Auth appDomain ?AppDomain; loginPath ?LoginPath; callbackPath ?CallbackPath.
+    ?R match ( 
+        ?RID a get; path ?LoginPath; 
+        protocol ?Protocol; port ?Port;
+        headers (host = ?AppDomain.); 
+        params ( state = ?StateHash. host = ?Host. ).
+    ).
+    system cut [].
+    ["f3auth_host=" ?Host "; HttpOnly; Secure; Path=/; Max-Age=600"] sconcat ?F3Cookie.
     [
         "https://logto.f3web.app/oidc/auth"
         "?client_id=0xdrjgnfvjdpn7wfgs1z2"
         "&response_type=code"
         "&scope=openid%20profile%20email"
-        "&redirect_uri=" ?CallbackURL
+        "&redirect_uri=" ?Protocol "://" ?AppDomain ":" ?Port ?CallbackPath
         "&state=" ?StateHash
         "&prompt=login"
     ] sconcat ?AuthURL.
@@ -23,9 +31,32 @@
     ?R response (?RID status 302; headers ( "Location" = ?AuthURL.  "Set-Cookie" = ?F3Cookie.).). 
 ).
 
+// tenant/login stores referer and state -> base/login
 (
-    f3Auth clientId ?ClientId; clientSecret ?ClientSecret; loginPath ?LoginPath; callbackPath ?CallbackPath; callbackUrl ?CallbackURL; appUrl ?AppUrl; loginRedirect ?LoginRedirect. 
-    ?R match ( ?RID a get; path ?CallbackPath; params ( code = ?Code. state = ?State. ); cookies ( f3auth_state = ?State. ). ).
+    f3Auth appDomain ?AppDomain; loginPath ?LoginPath.
+    ?R match ( 
+        ?RID a get; path ?LoginPath; 
+        protocol ?Protocol; port ?Port; 
+        headers (host = ?Host. referer = ?Referer.). 
+    ).
+    ?RID sha256 ?StateHash.
+    ["f3auth_referer=" ?Referer "; HttpOnly; Secure; Path=/; Max-Age=600"] sconcat ?F3Cookie1.
+    ["f3auth_state=" ?StateHash "; HttpOnly; Secure; Path=/; Domain=.localhost; Max-Age=600"] sconcat ?F3Cookie2.
+    [
+        ?Protocol "://" ?AppDomain ":" ?Port ?LoginPath
+        "?state=" ?StateHash
+        "&host=" ?Host
+        "&referer=" ?Referer
+    ] sconcat ?AuthURL.
+) => ( 
+    ?R response (?RID status 302; headers ( "Location" = ?AuthURL.  "Set-Cookie" = ?F3Cookie1. "Set-Cookie" = ?F3Cookie2.).). 
+).
+
+(
+    f3Auth clientId ?ClientId; clientSecret ?ClientSecret; loginPath ?LoginPath; callbackPath ?CallbackPath; appDomain ?AppDomain; loginRedirect ?LoginRedirect. 
+    ?R match ( ?RID a get; path ?CallbackPath; protocol ?Protocol; port ?Port; params ( code = ?Code. state = ?State. ); cookies ( f3auth_state = ?State. f3auth_referer = ?F3AuthReferer. ). ).
+    system cut [].
+    [?Protocol "://" ?AppDomain ":" ?Port ?CallbackPath] sconcat ?CallbackURL.
     ( 
         tokenReq a post; 
         url "https://logto.f3web.app/oidc/token";
@@ -49,6 +80,14 @@
 ) => ( 
     ?R response ( ?RID status 302; headers ( "Location" = ?LoginRedirect. "Set-Cookie" = ?AuthCookie.).). 
 ).
+
+//base callback -> tenant callback
+(
+    f3Auth callbackPath ?CallbackPath; appDomain ?AppDomain. 
+    ?R match ( ?RID a get; path ?CallbackPath; protocol ?Protocol; port ?Port; params ( code = ?Code. state = ?State. ); cookies ( f3auth_host = ?F3AuthHost. ). ).
+    ?F3AuthHost neq ?AppDomain.
+    [?Protocol "://" ?F3AuthHost ":" ?Port ?CallbackPath "?code=" ?Code "&state=" ?State] sconcat ?Redirect.
+) => ( ?R response (?RID status 302; headers ( "Location" = ?Redirect. ).).).
 
 (
     f3Auth logoutPath ?LogoutPath; logoutRedirect ?LogoutRedirect.

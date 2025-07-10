@@ -17,7 +17,7 @@ dateTimeToGraph(date(Y, M, D, H, M, S, Off, TZ, Dst), graph([
 
 
 builtin(now).
-builtin(duration).
+builtin(parseTimeStamp).
 
 b(system, now, T) :- get_time(T).
 
@@ -31,6 +31,6 @@ b(DateTimeGraph, [setTimeZone, TZ], NewDateTimeGraph) :-
     dateTimeToGraph(NewDateTime, NewDateTimeGraph).
     
 
-
+b(TimeStampString, parseTimeStamp, TimeStamp) :- parse_time(TimeStampString, TimeStamp).
 
 :- initialization(run_tests).

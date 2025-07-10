@@ -5,7 +5,7 @@ f3Auth encryptionSecretKey "Some secret key";
     loginPath "/f3auth/login";
     logoutPath "/f3auth/logout";
     callbackPath "/f3auth/callback";
-    appUrl "http://localhost:3000";
+    appDomain "localhost";
     loginRedirect "/";
     logoutRedirect "/".
 (
@@ -22,28 +22,132 @@ f3Auth encryptionSecretKey "Some secret key";
 ( ?R match (?RID headers (host = ?Host.).). ?Host [[splitString "."] >> [0]] ?RSub. ?RSub neq "bbookk".) 
 => ( ?R subdomain ?RSub.).
 
-(?XS sconcat ?S. ["<html> <head> <title>F3 Auth Demo</title> <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'> </head> <body><main class='container'>" ?S "</main></body></html>" ] sconcat ?H. ) 
+(?XS sconcat ?S. ["<html data-theme='light'> <head> <title>F3 Auth Demo</title> 
+"
+// <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'>
+
+// <link rel='stylesheet' href='https://outstanding-winter.surge.sh/picogram.css'>
+"
+
+<link rel='stylesheet' href='http://127.0.0.1:5500/picogram.css'>
+<link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic'>
+<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css'>
+<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.css'>
+<style>
+nav { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; }
+nav ul { display: flex; list-style: none; margin: 0; padding: 0; align-items: center; }
+nav ul li { margin-right: 1rem; display: flex; margin: auto; }
+fieldset[role='group'] { display: flex; border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0; margin: 0; }
+fieldset[role='group'] input { border: none; border-radius: 0; margin: 0; flex: 1; }
+fieldset[role='group'] input[type='submit'] { flex: none; width: min-content; }
+fieldset[role='group'] input:not(:last-child) { border-right: 1px solid #d1d5db; }
+fieldset[role='group'] input:first-child { border-top-left-radius: 0.375rem; border-bottom-left-radius: 0.375rem; }
+fieldset[role='group'] input:last-child { border-top-right-radius: 0.375rem; border-bottom-right-radius: 0.375rem; }
+</style>
+ </head> <body><main class='container'>" ?S "</main></body></html>" ] sconcat ?H. ) 
 => (?XS buildHTML ?H.).
 
 (?R f3AuthWidget ?F3AuthWidget. ["<nav> <ul><li>bbookk.io</li></ul> <ul> <li>" ?F3AuthWidget "</li> </ul></nav>"] sconcat ?NavHTML. ) 
 => (?R navbar ?NavHTML.).
 
+
 (
-    ?R match ( ?RID a get; path "/".); navbar ?Nav.
-    // @html
+   ?R f3AuthSession ?F3AS. ?F3AS match ( sub = ?UserId. name = ?UserName. email = ?UserEmail. ).
+   ?txn lmdbStartRW "./db"; lmdbInsert { ?UserId a User; name ?UserName; email ?UserEmail.}; lmdbEnd [].
+) => ( ?R initTenant ?F3AS.).
+
+( 
+    ?r [f3AuthSession >> match ] ( sub = ?UserId. ). 
+    ?txn lmdbStartR "./db"; lmdbQuery { ?UserId a User; tenantSubdomain ?s. }; lmdbEnd []. 
+    system cut [].
+) 
+=> ( ?r tenantSubdomainString ?s.).
+?r tenantSubdomainString "".
+
+(?r match (?RID port 80; protocol "http".). system cut [].) 
+=> (?r portString "".).
+(?r match (?RID port 443; protocol "https".). system cut [].) 
+=> (?r portString "".).
+(?r match (?RID port ?Port.). [":" ?Port] sconcat ?PortString.) 
+=> (?r portString ?PortString.).
+
+(
+    f3Auth appDomain ?AppDomain.
+   ?r match ( ?RID protocol ?Protocol. ); [f3AuthSession >> match ] ( sub = ?UserId. ); tenantSubdomainString ?S; portString ?PortString.
+    system cut [].
+    [?Protocol "://" ?S "." ?AppDomain ?PortString] sconcat ?AppURL.
+   // 2@html
+   ["<form action='/set-tenant-subdomain' method='post'>
+   <fieldset role='group'>
+   <input type='text' name='subdomain' required value='" ?S "'>
+   <input type='submit' value='Set Subdomain'>
+   </fieldset>
+   <small>Your app is available at <a href='" ?AppURL "'> " ?AppURL "</a></small>
+   </form>
+   " ] sconcat ?HTML.
+) => ( ?r tenantSubdomainForm ?HTML. ).
+?R tenantSubdomainForm "".
+
+( 
+   ?r match ( ?RID a post; path "/set-tenant-subdomain"; body ( subdomain = ?Subdomain. ); headers ( referer = ?referer.).);
+    [f3AuthSession >> match] ( sub = ?UserId. ). 
+   ?txn lmdbStartRW "./db"; lmdbDelete {?UserId tenantSubdomain ?OldSubdomain.}; lmdbInsert { ?UserId tenantSubdomain ?Subdomain. }; lmdbEnd [].
+) => ( ?r response (?RID status 302; headers ( "Location" = ?referer. ). ).  ).
+
+(
+     ?r [f3AuthSession >> match] ( sub = ?UserId. ).
+    ?Txn lmdbStartR "./db". 
+    [?Option ( 
+        ?Txn lmdbQuery { ?UserId calendar ?CalendarId. ?CalendarId name ?CalendarName.}. 
+        ["<tr><td>" ?CalendarName "</td><td><a href='/calendar/" ?CalendarId "'>Edit</a></td></tr>"] sconcat ?Option. )
+    ] collect ?Options.
+    ?Txn lmdbEnd [].
+    system cut [].
+    ?Options sconcat ?OptionsHTML.
+    ["<table>
+    <thead>
+        <tr>
+            <th>Calendar Name</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+    " ?OptionsHTML "
+    </tbody>
+    </table>"] sconcat ?SelectHTML.
+) => (?r calendarSelect ?SelectHTML.).
+?r calendarSelect "<table><thead><tr><th>Calendar Name</th><th>Action</th></tr></thead><tbody></tbody></table>".
+
+
+?R calendarForm "<form action='/create-calendar' method='post'>
+<fieldset role='group'>
+    <input type='text' placeholder='Calendar Name' name='calendarname' required>
+    <input type='submit' value='Create Calendar'>
+ </fieldset>   
+    </form>".
+
+( 
+   ?r match ( ?RID a post; path "/create-calendar"; body ( calendarname = ?CalendarName. ); headers ( referer = ?referer.).);
+    [f3AuthSession >> match] ( sub = ?UserId. ). 
+   ?RID sha256 ?RIDHash.
+   ["calendar_" ?RIDHash] sconcat ?CalendarId.
+   ?txn lmdbStartRW "./db"; lmdbInsert { ?UserId calendar ?CalendarId. ?CalendarId a Calendar; name ?CalendarName. }; lmdbEnd [].
+) => ( ?r response (?RID status 302; headers ( "Location" = ?referer. ). ).  ).
+
+(
+    ?R match ( ?RID a get; path "/".); navbar ?Nav; [initTenant >> toString]  ?F3AuthSessionInfo; 
+        tenantSubdomainForm ?tenantSubdomainForm;
+        calendarForm ?CalendarForm;
+        calendarSelect ?CalendarSelect.
+    system cut [].
+    // 1@html
     [
         ?Nav 
-        "<h1>Dashboard</h1>
-        <p>This is a simple demonstration of the F3 Auth system.</p>
-        <form action='/set-slug' method='post'>
-            <fieldset class='grid'>
-            <label for='slug'>Slug:
-
-            <input type='text' name='slug' required>
-            <input type='submit' value='Submit'>
-            </label>
-            </fieldset>
-        </form>"
+        "<h1>Dashboard</h1>"
+        ?tenantSubdomainForm
+        ?CalendarForm
+        ?CalendarSelect
+        "<div>Session Info: <span>" ?F3AuthSessionInfo "</span></div>"
     ] buildHTML ?ResponseHTML.
 ) => ( ?R response (
     ?RID status 200; 
@@ -51,4 +155,141 @@ f3Auth encryptionSecretKey "Some secret key";
     body ?ResponseHTML.
 ). ).
 
+(
+    ?R match ( ?RID a get; path "/".); navbar ?Nav; subdomain ?Tenant. 
+    ?Txn lmdbStartR "./db"; lmdbQuery { ?User a User; name ?UserName; tenantSubdomain ?Tenant. }; lmdbEnd [].
+    system cut [].
+
+    [?Nav "<h1>Welcome the calendar of " ?UserName "</h1>"] buildHTML ?ResponseHTML. 
+)
+=> (?R response (?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". ); body ?ResponseHTML. ).).
+
+(?R match ( ?RID a get; path "/".); navbar ?Nav. [?Nav "<h1>Welcome to bbookk.io</h1>"] buildHTML ?ResponseHTML. )
+=> (?R response (?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". ); body ?ResponseHTML. ).).
+
+(
+    ?R match ( ?RID a get; path ?Path.); navbar ?Nav; 
+    [f3AuthSession >> match] ( sub = ?UserId. ).
+    system log ["QQQQQQQQQQQ normal path for debugging" ?Path].
+    ?Path [splitString "/"] ?PathSplit.
+    system log ["QQQQQQQQQQQ Split path for debugging" ?PathSplit].
+    ?PathSplit = ["" "calendar" ?CalendarId].
+    ?Txn lmdbStartR "./db"; lmdbQuery { ?UserId calendar ?CalendarId. ?CalendarId name ?CalendarName. }; lmdbEnd [].
+    system cut [].
+    ["<a href='/calendar/" ?CalendarId "/create-event'><button>Create Event</button></a>"] sconcat ?CreateEventButton.
+    
+    ?Txn2 lmdbStartR "./db".
+    [?EventRow (
+        ?Txn2 lmdbQuery { ?CalendarId event ?EventId. ?EventId name ?EventName; start ?EventStart; frequency ?EventFrequency. }.
+        ["<tr><td>" ?EventName "</td><td>" ?EventStart "</td><td>" ?EventFrequency "</td></tr>"] sconcat ?EventRow.
+    )] collect ?EventRows.
+    ?Txn2 lmdbEnd [].
+    ?EventRows sconcat ?EventRowsHTML.
+    
+    ["<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Start</th>
+            <th>Frequency</th>
+        </tr>
+    </thead>
+    <tbody>
+    " ?EventRowsHTML "
+    </tbody>
+    </table>"] sconcat ?EventsTable.
+    
+    [?Nav "<h1>" ?CalendarName "</h1>" ?CreateEventButton ?EventsTable] buildHTML ?ResponseHTML.
+) => (?R response (?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". ); body ?ResponseHTML. ).).
+
+(
+    ?R match ( ?RID a get; path ?Path.); navbar ?Nav;
+    [f3AuthSession >> match] ( sub = ?UserId. ).
+    ?Path [splitString "/"] ?PathSplit.
+    system log ["Split path for debugging" ?PathSplit].
+    ?PathSplit = ["" "calendar" ?CalendarId "create-event"].
+    ?Txn lmdbStartR "./db"; lmdbQuery { ?UserId calendar ?CalendarId. ?CalendarId name ?CalendarName. }; lmdbEnd [].
+    system cut [].
+    
+    ["<h1>Create Event for " ?CalendarName "</h1>
+    <form action='/calendar/" ?CalendarId "/create-event' method='post'>
+        <label for='eventname'>Event Name</label>
+        <input type='text' id='eventname' placeholder='Event Name' name='eventname' required>
+        <label for='description'>Description</label>
+        <input type='text' id='description' placeholder='Description' name='description' required>
+        <label for='start'>Start Date & Time</label>
+        <input type='datetime-local' id='start' name='start' required>
+        <label for='duration'>Duration</label>
+        <input type='time' id='duration' name='duration' required>
+        <label for='frequency'>Frequency</label>
+        <select id='frequency' name='frequency' required>
+            <option value='single'>Single</option>
+            <option value='weekly'>Weekly</option>
+        </select>
+        <label for='capacity'>Capacity</label>
+        <input type='number' id='capacity' placeholder='Capacity' name='capacity' min='1' required>
+        <label for='paymentmethods'>Payment Methods (comma separated)</label>
+        <input type='text' id='paymentmethods' placeholder='Payment Methods (comma separated)' name='paymentmethods'>
+        <label for='finaliteration'>Final Iteration</label>
+        <input type='number' id='finaliteration' placeholder='Final Iteration' name='finaliteration' min='1'>
+        <label for='openbookings'>Open Bookings Before Start</label>
+        <input type='time' id='openbookings' placeholder='Open Bookings Before Start' name='openbookings'>
+        <input type='submit' value='Create Event'>
+    </form>"] sconcat ?CreateEventForm.
+    
+    [?Nav ?CreateEventForm] buildHTML ?ResponseHTML.
+) => (?R response (?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". ); body ?ResponseHTML. ).).
+
+(
+    ?R match ( ?RID a post; path ?Path; 
+        body ( eventname = ?EventName. description = ?Description. start = ?Start. 
+               duration = ?Duration. frequency = ?Frequency. capacity = ?Capacity.
+               paymentmethods = ?PaymentMethods. finaliteration = ?FinalIteration.
+               openbookings = ?OpenBookings. );
+        headers ( referer = ?referer.).);
+    [f3AuthSession >> match] ( sub = ?UserId. ).
+    ?Path [splitString "/"] ?PathSplit.
+    ?PathSplit = ["" "calendar" ?CalendarId "create-event"].
+    
+    ?RID sha256 ?RIDHash.
+    ["event_" ?RIDHash] sconcat ?EventId.
+    
+
+    
+    ?txn lmdbStartRW "./db"; 
+    lmdbInsert { 
+        ?CalendarId event ?EventId. 
+        ?EventId a Event; 
+            name ?EventName; 
+            description ?Description; 
+            start ?Start; 
+            duration ?Duration; 
+            frequency ?Frequency; 
+            capacity ?Capacity; 
+            paymentMethods ?PaymentMethods;
+            finalIteration ?FinalIteration; 
+            openBookingsXSecondsBeforeStart ?OpenBookings. 
+    }; 
+    lmdbEnd [].
+    
+    ["/calendar/" ?CalendarId] sconcat ?RedirectPath.
+) => ( ?R response (?RID status 302; headers ( "Location" = ?RedirectPath. ). ).  ).
+
+
+
+
+
+
+
+
+
 system runWebServer 3000.
+system query [ ?XS ( 
+     [[?class :: ?s ?p ?o] ( ?txn lmdbStartR "./db"; lmdbQuery { ?s a ?class; ?p ?o. }; lmdbEnd [].  )] collect ?XS.
+)].
+// system query [ [subdomain ?s ?Subdomain ?p ?o] ( 
+//      ?txn lmdbStartR "./db"; lmdbQuery { ?s tenantSubdomain ?Subdomain; ?p ?o. }; lmdbEnd []. 
+// )].
+// system query [ [subdomain2 ?s ?Subdomain ] ( 
+//      ?txn lmdbStartR "./db"; lmdbQuery { ?s tenantSubdomain ?Subdomain. }; lmdbEnd []. 
+// )].

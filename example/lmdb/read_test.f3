@@ -9,3 +9,10 @@
 ).
 // system debug listing.
 system query [ ?X ( result found ?X. ) ].
+system query [ [2 ?A ?B] ( 
+
+     ?ReadTxn lmdbStartR "./lmdb_data".
+    ?A = alice.
+    ?ReadTxn lmdbQuery { ?A likes ?B.}.
+    ?ReadTxn lmdbEnd [].
+ ) ].

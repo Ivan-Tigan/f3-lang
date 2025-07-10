@@ -368,15 +368,18 @@ main([Arg1, Arg2]) :-
    % format("Created temporary file: ~w~n", [File]),
    write(Stream, ':- dynamic p/3.\n\n'),
 
-   forall(p(graph(G1), => ,graph(G2)), (
+   forall(p(A,B,C),
+      (p(A,B,C) = p(graph(G1), => ,graph(G2)) -> 
          forall(member(M, G2), (
                build_rule(M, G1, Rule),
                % format('Creating rule: ~w~n', [Rule]),
                %  assertz(Rule)
                format(Stream, '~q.~n', [Rule])
             ))
+      ; format(Stream, '~q.~n', [p(A,B,C)])
       )),
    close(Stream),
+   retractall(p(_,_,_)),  % Clear all p/3 facts to avoid duplicates
    % Read and print the file contents
    read_file_to_string(File, Contents, []),
    % format("Generated facts and rules:~n~w~n", [Contents]),

@@ -136,6 +136,9 @@ const nodeToProlog = (node: Node): string => {
   return typeof node === "string"
     ? node.charAt(0) === "?"
       ? `F3_VAR_PREFIX_${node.slice(1)}`
+      : node.charAt(0) === node.charAt(0).toUpperCase() &&
+        /[A-Z]/.test(node.charAt(0))
+      ? `'${node}'`
       : `${node}`
     : typeof node === "number"
     ? `${node}`

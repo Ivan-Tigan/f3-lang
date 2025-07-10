@@ -50,21 +50,70 @@ handle_request(Request) :-
           BodyTriples = []
        ),
        
-       % Build the triple pattern with body
+       % Build the triple pattern with body using comprehensive request processing
        generate_request_id(RequestId),
-          format(user_error, "Generated request id: ~w~n", [RequestId]),
+       format(user_error, "Generated request id: ~w~n", [RequestId]),
        atom_string(PathAtom, Path),
        method_to_request_type(Method, RequestType),
-       Pattern = graph([
+       
+       % Get server port and convert to string
+       (   memberchk(port(PortAtom), Request)
+       ->  atom_string(PortAtom, PortString)
+       ;   PortString = "80"  % Default if not found
+       ),
+       
+       % Extract protocol from request (HTTP/HTTPS) and convert to string
+       (   memberchk(protocol(ProtocolAtom), Request)
+       ->  atom_string(ProtocolAtom, ProtocolString)
+       ;   ProtocolString = "http"  % Default to http
+       ),
+       
+       % Build basic pattern with request type, path, port, protocol, and body
+       BaseTriples = [
            p(RequestId, a, RequestType),
            p(RequestId, path, Path),
+           p(RequestId, port, PortString),
+           p(RequestId, protocol, ProtocolString),
            p(RequestId, body, graph(BodyTriples))
-       ])
+       ],
+       
+       % Extract and include query parameters if present
+       (   memberchk(search(Search), Request),
+           Search \= []
+       ->  search_params_to_triples(Search, ParamTriples),
+           TriplesWithParams = [p(RequestId, params, graph(ParamTriples))|BaseTriples]
+       ;   TriplesWithParams = BaseTriples
+       ),
+       
+       % Extract cookies if present
+       (   memberchk(cookie(Cookies), Request)
+       ->  maplist(cookie_to_triple, Cookies, CookieTriples),
+           TriplesWithCookies = [p(RequestId, cookies, graph(CookieTriples))|TriplesWithParams]
+       ;   TriplesWithCookies = TriplesWithParams
+       ),
+       
+       % Extract other headers if needed (convert values to strings for consistency)
+       findall(p(HeaderName, =, HeaderValueString), 
+               (member(HeaderTerm, Request),
+                HeaderTerm =.. [HeaderName, HeaderValue],
+                \+ member(HeaderName, [path_info, protocol, peer, pool, input, method, request_uri, path, http_version, cookie]),
+                (atom(HeaderValue) ->
+                atom_string(HeaderValue, HeaderValueString)
+                ;   term_string(HeaderValue, HeaderValueString)  % Handle non-atom values
+                )
+               ), 
+               HeaderTriples),
+       (   HeaderTriples \= []
+       ->  AllTriples = [p(RequestId, headers, graph(HeaderTriples))|TriplesWithCookies]
+       ;   AllTriples = TriplesWithCookies
+       ),
+       
+       Pattern = graph(AllTriples)
     ;  % Regular request without body
        request_to_triple_pattern(Request, Pattern)
     ),
     
-    format(user_error, "Request triple pattern: ~w~n", [Pattern]),
+    % format(user_error, "Request triple pattern: ~w~n", [Pattern]),
 
     % Try to match request with a rule
     (   match_request_pattern(Pattern, Response)
@@ -128,10 +177,12 @@ parse_form_data(RawForm, FormData) :-
     maplist(parse_form_pair, Pairs, FormData).
 
 % Parse individual form field
-parse_form_pair(Pair, Name=Value) :-
+parse_form_pair(Pair, Name=ValueString) :-
     split_string(Pair, '=', '', [NameEncoded, ValueEncoded]),
     uri_encoded(query_value, Name, NameEncoded),
-    uri_encoded(query_value, Value, ValueEncoded).
+    uri_encoded(query_value, Value, ValueEncoded),
+    % Convert value to string to ensure consistency
+    (atom(Value) -> atom_string(Value, ValueString) ; ValueString = Value).
 
 % Convert form data to triples format
 form_data_to_triples(FormData, Triples) :-
@@ -167,10 +218,24 @@ request_to_triple_pattern(Request, TriplePattern) :-
     % Determine request type based on HTTP method
     method_to_request_type(Method, RequestType),
     
-    % Build basic pattern with request type and path
+    % Get server port and convert to string
+    (   memberchk(port(PortAtom), Request)
+    ->  atom_string(PortAtom, PortString)
+    ;   PortString = "80"  % Default if not found
+    ),
+    
+    % Extract protocol from request (HTTP/HTTPS) and convert to string
+    (   memberchk(protocol(ProtocolAtom), Request)
+    ->  atom_string(ProtocolAtom, ProtocolString)
+    ;   ProtocolString = "http"  % Default to http
+    ),
+    
+    % Build basic pattern with request type, path, port, and protocol
     BaseTriples = [
         p(RequestId, a, RequestType),
-        p(RequestId, path, Path)
+        p(RequestId, path, Path),
+        p(RequestId, port, PortString),
+        p(RequestId, protocol, ProtocolString)
     ],
     
     % Extract and include query parameters if present

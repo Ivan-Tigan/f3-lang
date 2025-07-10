@@ -4,7 +4,7 @@
 (
     ?WriteTxn lmdbStartRW "./lmdb_data".
     ?WriteTxn lmdbInsert {
-        alice age 25; likes programming.
+        alice age 25; likes programming, pizza.
         bob age 30; likes math.
         
     }.
@@ -12,14 +12,18 @@
 ) => (
     result inserted [alice bob].
 ).
+
+( ?txn lmdbStartRW "./lmdb_data"; lmdbDelete {alice likes ?x. }; lmdbEnd []. ) => ( result deleted [delete complete]. ).
+
 (    
     ?ReadTxn lmdbStartR "./lmdb_data".
     ?ReadTxn lmdbQuery { ?Person likes ?Subject. }.
     ?ReadTxn lmdbEnd [].
 ) => (
-    result found [?Person ?Subject].
+    result found [?Person likes ?Subject].
 ).
 
-system query [ ?X ( result inserted ?X. ) ].
+// system query [ ?X ( result inserted ?X. ) ].
+system query [ ?X ( result deleted ?X. ) ].
 
 system query [ ?X ( result found ?X. ) ].

@@ -12,6 +12,7 @@ user:builtin(lmdbStartRW).
 user:builtin(lmdbEnd).
 user:builtin(lmdbInsert).
 user:builtin(lmdbQuery).
+user:builtin(lmdbDelete).
 
 % Transaction management predicates
 
@@ -38,6 +39,11 @@ user:b(Txn, lmdbInsert, p(S, P, O)) :-
 % The F3 syntax "Txn lmdbQuery { S P O. }" gets parsed into this
 user:b(Txn, lmdbQuery, p(S, P, O)) :-
     lmdbquery(Txn, S, P, O).
+
+% Txn lmdbDelete p(S, P, O) - Delete a triple from the database
+% The F3 syntax "Txn lmdbDelete { S P O. }" gets parsed into this
+user:b(Txn, lmdbDelete, p(S, P, O)) :-
+    lmdbdelete(Txn, S, P, O).
 
 % Tests
 :- begin_tests(lmdb_builtins).
