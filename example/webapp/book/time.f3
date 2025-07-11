@@ -1,0 +1,113 @@
+// Unix timestamp manipulation library for F3
+
+// Constants as triples
+time secondsPerDay 86400.
+time secondsPerHour 3600.
+time secondsPerMinute 60.
+
+// Get weekday from Unix timestamp (0 = Monday, 1 = Tuesday, etc.)
+// Unix epoch (Jan 1, 1970) was a Thursday, so we add 3 to align (Thu=3, Mon=0)
+( 
+    ?Timestamp floor ?TimestampSeconds.
+    time secondsPerDay ?SecondsPerDay.
+    [?TimestampSeconds ?SecondsPerDay] floordiv ?Days.
+    [?Days 3] + ?DaysOffset.
+    [?DaysOffset 7] mod ?Weekday.
+) => ( ?Timestamp weekday ?Weekday. ).
+
+// Get start of day (nullify hours/minutes/seconds)
+( 
+    ?Timestamp floor ?TimestampSeconds.
+    time secondsPerDay ?SecondsPerDay.
+    [?TimestampSeconds ?SecondsPerDay] floordiv ?Days.
+    [?Days ?SecondsPerDay] * ?DayStart.
+) => ( ?Timestamp dayStart ?DayStart. ).
+
+// Add days to timestamp
+( 
+    time secondsPerDay ?SecondsPerDay.
+    [?Days ?SecondsPerDay] * ?DaySeconds.
+    [?Timestamp ?DaySeconds] + ?Result.
+) => ( [?Timestamp ?Days] addDays ?Result. ).
+
+// Subtract days from timestamp
+( 
+    time secondsPerDay ?SecondsPerDay.
+    [?Days ?SecondsPerDay] * ?DaySeconds.
+    [?Timestamp ?DaySeconds] - ?Result.
+) => ( [?Timestamp ?Days] subDays ?Result. ).
+
+// Get start of week (Monday = 0)
+( 
+    ?Timestamp weekday ?Weekday.
+    [?Timestamp ?Weekday] subDays ?WeekStartWithTime.
+    ?WeekStartWithTime dayStart ?WeekStart.
+) => ( ?Timestamp weekStart ?WeekStart. ).
+
+// Get hour from timestamp
+( 
+    ?Timestamp floor ?TimestampSeconds.
+    time secondsPerHour ?SecondsPerHour.
+    ?TimestampSeconds dayStart ?DayStart.
+    [?TimestampSeconds ?DayStart] - ?SecondsInDay.
+    [?SecondsInDay ?SecondsPerHour] floordiv ?Hour.
+) => ( ?Timestamp hour ?Hour. ).
+
+// Get minute from timestamp
+( 
+    ?Timestamp floor ?TimestampSeconds.
+    time secondsPerHour ?SecondsPerHour.
+    time secondsPerMinute ?SecondsPerMinute.
+    ?TimestampSeconds dayStart ?DayStart.
+    [?TimestampSeconds ?DayStart] - ?SecondsInDay.
+    [?SecondsInDay ?SecondsPerHour] mod ?SecondsInHour.
+    [?SecondsInHour ?SecondsPerMinute] floordiv ?Minute.
+) => ( ?Timestamp minute ?Minute. ).
+
+// Get second from timestamp
+( 
+    ?Timestamp floor ?TimestampSeconds.
+    time secondsPerMinute ?SecondsPerMinute.
+    ?TimestampSeconds dayStart ?DayStart.
+    [?TimestampSeconds ?DayStart] - ?SecondsInDay.
+    [?SecondsInDay ?SecondsPerMinute] mod ?Second.
+) => ( ?Timestamp second ?Second. ).
+
+// Add hours to timestamp
+( 
+    time secondsPerHour ?SecondsPerHour.
+    [?Hours ?SecondsPerHour] * ?HourSeconds.
+    [?Timestamp ?HourSeconds] + ?Result.
+) => ( [?Timestamp ?Hours] addHours ?Result. ).
+
+// Add minutes to timestamp
+( 
+    time secondsPerMinute ?SecondsPerMinute.
+    [?Minutes ?SecondsPerMinute] * ?MinuteSeconds.
+    [?Timestamp ?MinuteSeconds] + ?Result.
+) => ( [?Timestamp ?Minutes] addMinutes ?Result. ).
+
+// Check if timestamp is same day
+( 
+    ?Timestamp1 dayStart ?Day1.
+    ?Timestamp2 dayStart ?Day2.
+    [?Day1 ?Day2] = ?Result.
+) => ( [?Timestamp1 ?Timestamp2] sameDay ?Result. ).
+
+// Format weekday name (Monday = 0)
+0 weekdayName "Monday".
+1 weekdayName "Tuesday".
+2 weekdayName "Wednesday".
+3 weekdayName "Thursday".
+4 weekdayName "Friday".
+5 weekdayName "Saturday".
+6 weekdayName "Sunday".
+
+
+// system query [[1 ?X] ( system [now >> weekday >> weekdayName] ?X.)].
+// system query [[2 ?X] ( system [now >> dayStart >> [timeStampToString "%a, %d %b %Y %T GMT"]] ?X.)].
+// system query [[3 ?X] ( "2006-12-08T17:29:44+02:00" [parseTimeStamp >> [timeStampToString "%a, %d %b %Y %T GMT"]] ?X.)].
+// system query [[4 ?X] ( system now ?Now. [?Now 3] [addDays >> weekday >> weekdayName] ?X.)].
+// system query [[5 ?X] ( system now ?Now. ?Now [weekStart >> weekday >> weekdayName] ?X.)].
+
+// system query [[6 ?X] ( "13:00" [parseTime >> [timeStampToString "%T"]] ?X.)].

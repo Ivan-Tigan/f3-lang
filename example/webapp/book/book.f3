@@ -167,6 +167,15 @@ fieldset[role='group'] input:last-child { border-top-right-radius: 0.375rem; bor
 (?R match ( ?RID a get; path "/".); navbar ?Nav. [?Nav "<h1>Welcome to bbookk.io</h1>"] buildHTML ?ResponseHTML. )
 => (?R response (?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". ); body ?ResponseHTML. ).).
 [3 4] ^ X.
+
+(
+    ?Txn lmdbQuery { ?EventId start ?StartT; frequency "weekly". }.
+    time secondsPerDay ?SecondsPerDay.
+    [?SecondsPerDay 7] * ?SecondsPerWeek.
+    [?SecondsPerWeek ?Iteration] * ?SecondsOffset.
+    [?StartT ?SecondsOffset] + ?IterationTimeStamp.
+) => ( ?Txn lmdbQuery { ?EventId [iterationTimeStamp ?Iteration] ?IterationTimeStamp. }.).
+
 (
     ?R match ( ?RID a get; path ?Path.); navbar ?Nav; 
     [f3AuthSession >> match] ( sub = ?UserId. ).
@@ -180,8 +189,10 @@ fieldset[role='group'] input:last-child { border-top-right-radius: 0.375rem; bor
     
     ?Txn2 lmdbStartR "./db".
     [?EventRow (
-        ?Txn2 lmdbQuery { ?CalendarId event ?EventId. ?EventId name ?EventName; start ?EventStart; frequency ?EventFrequency. }.
-        ["<tr><td>" ?EventName "</td><td>" ?EventStart "</td><td>" ?EventFrequency "</td></tr>"] sconcat ?EventRow.
+        ?Txn2 lmdbQuery { ?CalendarId event ?EventId. ?EventId name ?EventName; start ?EventStartT; frequency ?EventFrequency; duration ?DurationT. }.
+        ?EventStartT [timeStampToString "%a, %d %b %Y %T GMT"] ?EventStart.
+        ?DurationT [timeStampToString "%H:%M"] ?Duration.
+        ["<tr><td>" ?EventName "</td><td>" ?EventStart "</td><td>" ?EventFrequency "</td><td>" ?Duration "</td></tr>"] sconcat ?EventRow.
     )] collect ?EventRows.
     ?Txn2 lmdbEnd [].
     ?EventRows sconcat ?EventRowsHTML.
@@ -192,6 +203,8 @@ fieldset[role='group'] input:last-child { border-top-right-radius: 0.375rem; bor
             <th>Name</th>
             <th>Start</th>
             <th>Frequency</th>
+            <th>Duration</th>
+            
         </tr>
     </thead>
     <tbody>
@@ -248,13 +261,14 @@ fieldset[role='group'] input:last-child { border-top-right-radius: 0.375rem; bor
                openbookings = ?OpenBookings. );
         headers ( referer = ?referer.).);
     [f3AuthSession >> match] ( sub = ?UserId. ).
-    ?Path [splitString "/"] ?PathSplit.
-    ?PathSplit = ["" "calendar" ?CalendarId "create-event"].
+    ?Path [splitString "/"]  ["" "calendar" ?CalendarId "create-event"].
     
     ?RID sha256 ?RIDHash.
     ["event_" ?RIDHash] sconcat ?EventId.
     
-
+    ?Start parseTimeStamp ?StartTimeStamp.
+    ?Duration parseTime ?DurationTime.
+    ?OpenBookings parseTime ?OpenBookingsTime.
     
     ?txn lmdbStartRW "./db"; 
     lmdbInsert { 
@@ -262,13 +276,13 @@ fieldset[role='group'] input:last-child { border-top-right-radius: 0.375rem; bor
         ?EventId a Event; 
             name ?EventName; 
             description ?Description; 
-            start ?Start; 
-            duration ?Duration; 
+            start ?StartTimeStamp; 
+            duration ?DurationTime; 
             frequency ?Frequency; 
             capacity ?Capacity; 
             paymentMethods ?PaymentMethods;
             finalIteration ?FinalIteration; 
-            openBookingsXSecondsBeforeStart ?OpenBookings. 
+            openBookingsXSecondsBeforeStart ?OpenBookingsTime. 
     }; 
     lmdbEnd [].
     
@@ -292,4 +306,12 @@ system query [ ?XS (
 // )].
 // system query [ [subdomain2 ?s ?Subdomain ] ( 
 //      ?txn lmdbStartR "./db"; lmdbQuery { ?s tenantSubdomain ?Subdomain. }; lmdbEnd []. 
+// )].
+
+// system query [ deleteEvents (
+
+//     ?Txn lmdbStartRW "./db";
+//         lmdbDelete { ?CalendarId event ?EventId. ?EventId ?P ?O. };
+//         lmdbEnd [].
+//     system cut [].    
 // )].
