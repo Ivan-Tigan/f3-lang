@@ -1,0 +1,13 @@
+(
+    [
+        ?X1 =< 50 and  
+        ?X2 =< 200 and
+        ?X1 + 0.2 * ?X2 =< 72 and
+        150 * ?X1 + 25 * ?X2 =< 10000 and
+        ?Z = 250 * ?X1 + 45 * ?X2 and
+        2 * [?Y1 + ?Y2] = ?X1 and
+        ?Y2 = 10
+    ] clpqr constraint; minimize [ ?Z + 5 ].
+) => (res is ?Z.).
+
+system query [[res is ?X] (res is ?X.)].

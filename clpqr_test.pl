@@ -10,6 +10,5 @@ main :-
     2*(Y1+Y2)=X1,
     Y2=10
   },
-  maximize(Z),
+  maximize(Z+5),
   format('X1: ~w, X2: ~w, Z: ~w, Y1: ~w, Y2: ~w~n', [X1, X2, Z, Y1, Y2]).
-  

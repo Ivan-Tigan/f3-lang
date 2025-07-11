@@ -127,10 +127,6 @@ user:p(Vars, ins, [Low, High]) :-
 user:p(Vars, ins, Domain) :-
     Vars ins Domain, !.
 
-% Labeling - label Variables (CLP(FD) style)
-user:p(label, Variables, true) :-
-    label(Variables).
-
 % Variables labels AllSolutions - collects all labeling solutions
 user:p(Variables, labels, AllSolutions) :-
     findall(Variables, label(Variables), AllSolutions).

@@ -1,8 +1,26 @@
-system query [[solutions ?AllSolutions] (
-    [3 +  [7 * ?Y]] = [max [?X + 10] [?X + 20]]. 
-    // [3 +  [7 * ?Y]] = [?X + 10].
-    ?X in [20 60].
-    [1 + ?Y] > [4 + ?Z].
-    ?Z in [1 2].
-    [?Y ?X ?Z] labels ?AllSolutions.
+0 fib 1. 1 fib 1.
+(
+    ?N > 1.
+    ?N < ?Result.
+    ?N1 = [?N - 1].
+    ?N2 = [?N - 2].
+    ?N1 fib ?Result1.
+    ?N2 fib ?Result2.
+    [?Result1 + ?Result2] = ?Result.
+) => ( ?N fib ?Result.).
+
+
+// system query [[solutions ?AllSolutions] (
+//     [3 +  [7 * ?Y]] = [max [?X + 10] [?X + 20]]. 
+//     // [3 +  [7 * ?Y]] = [?X + 10].
+//     ?X in [20 60].
+//     [1 + ?Y] > [4 + ?Z].
+//     ?Z in [1 2].
+//     [?Y ?X ?Z] labels ?AllSolutions.
+// )].
+
+
+system query [[fib ?R] (
+
+    ?R fib 13.
 )].
