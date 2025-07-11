@@ -166,7 +166,7 @@ fieldset[role='group'] input:last-child { border-top-right-radius: 0.375rem; bor
 
 (?R match ( ?RID a get; path "/".); navbar ?Nav. [?Nav "<h1>Welcome to bbookk.io</h1>"] buildHTML ?ResponseHTML. )
 => (?R response (?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". ); body ?ResponseHTML. ).).
-
+[3 4] ^ X.
 (
     ?R match ( ?RID a get; path ?Path.); navbar ?Nav; 
     [f3AuthSession >> match] ( sub = ?UserId. ).

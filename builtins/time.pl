@@ -1,5 +1,5 @@
 :- module(time, []).
-:- multifile p/3.
+:- multifile user:p/3.
 
 
 dateTimeToGraph(date(Y, M, D, H, M, S, Off, TZ, Dst), graph([
@@ -18,18 +18,17 @@ dateTimeToGraph(date(Y, M, D, H, M, S, Off, TZ, Dst), graph([
 
 
 
-p(system, now, T) :- get_time(T).
+user:p(system, now, T) :- get_time(T).
 
 
-p(Timestamp, timestampToDateTime, DateTimeGraph) :- stamp_date_time(TimeStamp, DateTime, 'UTC'), dateTimeToGraph(DateTime, DateTimeGraph).
+% p(Timestamp, timestampToDateTime, DateTimeGraph) :- stamp_date_time(TimeStamp, DateTime, 'UTC'), dateTimeToGraph(DateTime, DateTimeGraph).
 
-p(DateTimeGraph, [setTimeZone, TZ], NewDateTimeGraph) :- 
-    dateTimeToGraph(DateTime, DateTimeGraph),
-    date_time_stamp(DateTime, TimeStamp),
-    stamp_date_time(TimeStamp, NewDateTime, TZ),
-    dateTimeToGraph(NewDateTime, NewDateTimeGraph).
+% p(DateTimeGraph, [setTimeZone, TZ], NewDateTimeGraph) :- 
+%     dateTimeToGraph(DateTime, DateTimeGraph),
+%     date_time_stamp(DateTime, TimeStamp),
+%     stamp_date_time(TimeStamp, NewDateTime, TZ),
+%     dateTimeToGraph(NewDateTime, NewDateTimeGraph).
     
 
-p(TimeStampString, parseTimeStamp, TimeStamp) :- parse_time(TimeStampString, TimeStamp).
+% p(TimeStampString, parseTimeStamp, TimeStamp) :- parse_time(TimeStampString, TimeStamp).
 
-:- initialization(run_tests).

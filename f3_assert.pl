@@ -11,6 +11,7 @@
 :- use_module(builtins/json).
 :- use_module(builtins/crypto).
 :- use_module(builtins/pipe).
+:- use_module(builtins/math).
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
 :- multifile loaded/1.
@@ -30,6 +31,9 @@ load(DB) :-
         assertz(loaded(DB))
     ).
 
+
+
+p(system, now, T) :- get_time(T).
 
 
 p(A, =, B) :- A = B.
@@ -343,7 +347,7 @@ main([Arg1, Arg2]) :-
    % retractall(p(_,_,_)),  % Clear all p/3 facts to avoid duplicates
    % Read and print the file contents
    read_file_to_string(File, Contents, []),
-   format("Generated facts and rules:~n~w~n", [Contents]),
+   % format("Generated facts and rules:~n~w~n", [Contents]),
    % load_files(File, [dynamic(true)]).  % Use load_files with dynamic option
 
    consult(File),
