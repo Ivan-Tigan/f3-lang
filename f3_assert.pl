@@ -11,7 +11,9 @@
 :- use_module(builtins/json).
 :- use_module(builtins/crypto).
 :- use_module(builtins/pipe).
+:- use_module(builtins/clpfd).
 :- use_module(builtins/math).
+
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
 :- multifile loaded/1.
