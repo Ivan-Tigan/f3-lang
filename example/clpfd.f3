@@ -1,26 +1,67 @@
-// 0 fib 1. 1 fib 1.
-// (
-//     ?N > 1.
-//     ?N < ?Result.
-//     ?N1 = [?N - 1].
-//     ?N2 = [?N - 2].
-//     ?N1 fib ?Result1.
-//     ?N2 fib ?Result2.
-//     [?Result1 + ?Result2] = ?Result.
-// ) => ( ?N fib ?Result.).
+// F3 CLPFD Showcase - Constraint Logic Programming over Finite Domains
+// Demonstrates the unified syntax for constraint solving
 
-
-system query [[solutions ?AllSolutions] (
-    [3 +  [7 * ?Y]] = [max [?X + 10] [?X + 20]]. 
-    // [3 +  [7 * ?Y]] = [?X + 10].
-    ?X in [20 60].
-    [1 + ?Y] > [4 + ?Z].
-    ?Z in [1 2].
-    [?Y ?X ?Z] labels ?AllSolutions.
+// Example 1: Basic arithmetic with domain constraints
+system query [[basic X: ?X Y: ?Y] (
+    clpfd constraint [?X + ?Y = 10 & ?X in 1 5 & ?Y in 3 8]; 
+    label [?X ?Y].
 )].
 
+// Example 2: Multiple variables with shared domain
+system query [[multi A: ?A B: ?B C: ?C] (
+    clpfd constraint [?A ?B ?C ins 1 3 & ?A + ?B + ?C = 6 & ?A neq ?B]; label [?A ?B ?C].
+)].
 
-// system query [[fib ?R] (
+// Example 3: Complex expression with max function
+system query [[complex solutions: ?AllSolutions] (
+    clpfd constraint [ 
+        3 + 7 * ?Y = [max [?X + 10] [?X + 20]] 
+        & ?X in 20 60 
+        & 1 + ?Y > 4 + ?Z 
+        & ?Z in 1 2
+    ]; labels [[?Y ?X ?Z] ?AllSolutions].
+)].
 
-//     ?R fib 13.
-// )].
+// Example 4: Inequality constraints
+system query [[inequality X: ?X Y: ?Y] (
+    clpfd constraint [?X * ?Y < 20 & ?X > ?Y & ?X in 2 8 & ?Y in 1 5]; 
+    label [?X ?Y].
+)].
+
+// Example 5: Scheduling problem - assign tasks to time slots
+system query [[schedule solutions: ?AllSolutions] (
+    clpfd constraint [
+        ?Task1 ?Task2 ?Task3 ins 1 5 
+        & ?Task1 + 2 =< ?Task2  // Task1 takes 2 time units, must finish before Task2
+        & ?Task2 + 1 =< ?Task3  // Task2 takes 1 time unit, must finish before Task3
+        & ?Task3 =< 4           // Task3 must finish by time 4
+    ]; labels [[?Task1 ?Task2 ?Task3] ?AllSolutions].
+)].
+
+// Example 6: Resource allocation - distribute items among containers
+system query [[allocation C1: ?C1 C2: ?C2 C3: ?C3] (
+    clpfd constraint [
+        ?C1 + ?C2 + ?C3 = 15    // Total 15 items to distribute
+        & ?C1 >= 3 & ?C2 >= 2   // Minimum requirements
+        & ?C3 >= 1 & ?C1 =< 8   // Capacity constraints
+        & ?C2 =< 7 & ?C3 =< 6
+    ]; label [?C1 ?C2 ?C3].
+)].
+
+// Example 7: Number puzzle - find digits that satisfy equation
+system query [[puzzle A: ?A B: ?B C: ?C] (
+    clpfd constraint [
+        ?A ?B ?C ins 1 9        // Single digits 1-9
+        & ?A * 10 + ?B + ?C = 25 // Two-digit number AB plus C equals 25
+        & ?A neq ?B & ?B neq ?C & ?A neq ?C  // All different digits
+    ]; label [?A ?B ?C].
+)].
+
+// Example 8: Step-by-step solving (non-exhaustive search)
+system query [[step X: ?X Y: ?Y Z: ?Z] (
+    clpfd constraint [
+        ?X + 2 * ?Y + 3 * ?Z = 20
+        & ?X ?Y ?Z ins 1 8
+        & ?X < ?Y & ?Y < ?Z
+    ]; label [?X ?Y ?Z].  // Find one solution
+)].

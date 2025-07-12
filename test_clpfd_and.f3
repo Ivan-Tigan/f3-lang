@@ -1,0 +1,4 @@
+// Test & conjunction
+system query [[X ?X Y ?Y] (
+    clpfd constraint [?X = 25 & ?Y = 6].
+)].

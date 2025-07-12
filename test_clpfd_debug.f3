@@ -1,0 +1,4 @@
+// Debug CLPFD step by step
+system query [[Y ?Y] (
+    clpfd constraint [7 * ?Y = 42].
+)].

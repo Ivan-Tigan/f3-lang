@@ -76,59 +76,187 @@ build_min_max(Op, [First|Rest], Result) :-
     build_min_max(Op, Rest, RestResult),
     (Op = min -> Result = min(FirstExpr, RestResult) ; Result = max(FirstExpr, RestResult)).
 
-% Core arithmetic constraints (with cuts to override default predicates)
 
-% Equality: X = Y or [expr] = Y
-user:p(Left, =, Right) :-
+
+% New unified CLPFD interface - DCG parser adapted from CLPQR
+% DCG grammar for parsing constraint arrays
+constraints(Constraints) -->
+    constraint_expr(First),
+    constraint_rest(First, Constraints).
+
+constraint_rest(First, (First, Rest)) -->
+    [&],
+    constraint_expr(Second),
+    constraint_rest(Second, Rest).
+constraint_rest(Constraint, Constraint) --> [].
+
+constraint_expr(Constraint) -->
+    expression(Left),
+    comparison_op(Op),
+    expression(Right),
+    { Constraint =.. [Op, Left, Right] }.
+
+constraint_expr(Constraint) -->
+    expression(Var),
+    [in],
+    expression(Low),
+    expression(High),
+    { Constraint = in(Var, [Low, High]) }.
+
+constraint_expr(Constraint) -->
+    var_list(Vars),
+    [ins],
+    expression(Low),
+    expression(High),
+    { Constraint = ins(Vars, [Low, High]) }.
+
+constraint_expr(Constraint) -->
+    expression(Var),
+    [in],
+    expression(Domain),
+    { Constraint = in(Var, Domain) }.
+
+expression(Result) -->
+    term(Left),
+    add_expr(Left, Result).
+
+add_expr(Left, Result) -->
+    add_op(Op),
+    term(Right),
+    { Temp =.. [Op, Left, Right] },
+    add_expr(Temp, Result).
+add_expr(Result, Result) --> [].
+
+term(Result) -->
+    factor(Left),
+    mul_expr(Left, Result).
+
+mul_expr(Left, Result) -->
+    mul_op(Op),
+    factor(Right),
+    { Temp =.. [Op, Left, Right] },
+    mul_expr(Temp, Result).
+mul_expr(Result, Result) --> [].
+
+% Handle nested expression arrays like [Y + Z] and min/max  
+factor(Result) -->
+    [List], { 
+        is_list(List),
+        (   List = [First|_], nonvar(First), (First = min ; First = max) ->
+            % min/max expressions
+            transform_expr(List, Result)
+        ;   List = [Low, High], number(Low), number(High) ->
+            % Domain range [Low, High] - pass through as-is
+            Result = List
+        ;   List = [_] ->
+            % Single element list - unwrap it
+            List = [SingleExpr],
+            phrase(expression(Result), [SingleExpr])
+        ;   % Multi-element expression list
+            phrase(expression(Result), List)
+        )
+    }.
+
+factor(X) -->
+    [X], { 
+        \+ is_list(X),
+        (   var(X) -> true
+        ;   number(X) -> true  
+        ;   atom(X), \+ member(X, [+, -, *, /, =, <, >, =<, >=, neq, in, ins, &])
+        )
+    }.
+
+% Parse variable lists like ?X ?Y ?Z
+var_list([Var]) -->
+    [Var], { var(Var) }.
+var_list([Var|Rest]) -->
+    [Var], { var(Var) },
+    var_list(Rest).
+
+add_op(+) --> [+].
+add_op(-) --> [-].
+
+mul_op(*) --> [*].
+mul_op(/) --> [/].
+
+comparison_op(=) --> [=].
+comparison_op(<) --> [<].
+comparison_op(>) --> [>].
+comparison_op(=<) --> [=<].
+comparison_op(>=) --> [>=].
+comparison_op(neq) --> [neq].
+
+% Transform constraint array to individual constraint calls using DCG
+transform_constraints(List, Goals) :-
+    phrase(constraints(ParsedConstraints), List),
+    constraint_to_goals(ParsedConstraints, Goals).
+
+constraint_to_goals((First, Rest), (FirstGoal, RestGoals)) :-
+    !,
+    constraint_to_goals(First, FirstGoal),
+    constraint_to_goals(Rest, RestGoals).
+constraint_to_goals(Constraint, Goal) :-
+    constraint_to_clpfd_goal(Constraint, Goal).
+
+% Convert parsed constraints to direct CLPFD goals
+constraint_to_clpfd_goal(=(Left, Right), Goal) :-
     transform_expr(Left, LeftExpr),
     transform_expr(Right, RightExpr),
-    LeftExpr #= RightExpr, !.
+    Goal = (LeftExpr #= RightExpr).
 
-% Inequality: X neq Y
-user:p(Left, neq, Right) :-
+constraint_to_clpfd_goal(<(Left, Right), Goal) :-
     transform_expr(Left, LeftExpr),
     transform_expr(Right, RightExpr),
-    LeftExpr #\= RightExpr, !.
+    Goal = (LeftExpr #< RightExpr).
 
-% Greater than or equal: X >= Y
-user:p(Left, >=, Right) :-
+constraint_to_clpfd_goal(>(Left, Right), Goal) :-
     transform_expr(Left, LeftExpr),
     transform_expr(Right, RightExpr),
-    LeftExpr #>= RightExpr, !.
+    Goal = (LeftExpr #> RightExpr).
 
-% Less than or equal: X =< Y
-user:p(Left, =<, Right) :-
+constraint_to_clpfd_goal(=<(Left, Right), Goal) :-
     transform_expr(Left, LeftExpr),
     transform_expr(Right, RightExpr),
-    LeftExpr #=< RightExpr, !.
+    Goal = (LeftExpr #=< RightExpr).
 
-% Greater than: X > Y
-user:p(Left, >, Right) :-
+constraint_to_clpfd_goal(>=(Left, Right), Goal) :-
     transform_expr(Left, LeftExpr),
     transform_expr(Right, RightExpr),
-    LeftExpr #> RightExpr, !.
+    Goal = (LeftExpr #>= RightExpr).
 
-% Less than: X < Y
-user:p(Left, <, Right) :-
+constraint_to_clpfd_goal(neq(Left, Right), Goal) :-
     transform_expr(Left, LeftExpr),
     transform_expr(Right, RightExpr),
-    LeftExpr #< RightExpr, !.
+    Goal = (LeftExpr #\= RightExpr).
 
-% Domain constraints - convert array [Low, High] to Low..High
-user:p(Var, in, [Low, High]) :-
-    Var in Low..High, !.
+constraint_to_clpfd_goal(in(Var, [Low, High]), Goal) :-
+    number(Low), number(High), !,
+    Goal = (Var in Low..High).
 
-user:p(Var, in, Domain) :-
-    Var in Domain, !.
+constraint_to_clpfd_goal(in(Var, Domain), Goal) :-
+    Goal = (Var in Domain).
 
-user:p(Vars, ins, [Low, High]) :-
-    Vars ins Low..High, !.
+constraint_to_clpfd_goal(ins(Vars, [Low, High]), Goal) :-
+    number(Low), number(High), !,
+    Goal = (Vars ins Low..High).
 
-user:p(Vars, ins, Domain) :-
-    Vars ins Domain, !.
+constraint_to_clpfd_goal(ins(Vars, Domain), Goal) :-
+    Goal = (Vars ins Domain).
 
-% Variables labels AllSolutions - collects all labeling solutions
-user:p(Variables, labels, AllSolutions) :-
+% Main CLPFD constraint predicate
+% clpfd constraint [constraints]
+user:p(clpfd, constraint, ConstraintArray) :-
+    transform_constraints(ConstraintArray, Goals),
+    call(Goals).
+
+% Simple labeling
+% clpfd label [variables]
+user:p(clpfd, label, Variables) :-
+    label(Variables).
+
+% Labeling with all solutions
+% clpfd label [[variables] solutions]
+user:p(clpfd, labels, [Variables, AllSolutions]) :-
     findall(Variables, label(Variables), AllSolutions).
 
 % Global constraints
