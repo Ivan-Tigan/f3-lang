@@ -69,3 +69,4 @@ user:p(A, truncate, Result) :-
 user:p(A, round, Result) :-
     number(A),
     Result is round(A).
+

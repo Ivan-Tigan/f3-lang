@@ -1,13 +1,16 @@
-(
-    [
-        ?X1 =< 50 and  
-        ?X2 =< 200 and
-        ?X1 + 0.2 * ?X2 =< 72 and
-        150 * ?X1 + 25 * ?X2 =< 10000 and
-        ?Z = 250 * ?X1 + 45 * ?X2 and
-        2 * [?Y1 + ?Y2] = ?X1 and
-        ?Y2 = 10
-    ] clpqr constraint; minimize [ ?Z + 5 ].
-) => (res is ?Z.).
+system query [[X1: ?X1 X2: ?X2 Z: ?Z Y1: ?Y1 Y2: ?Y2] (
+    clpqr constraint [
+        ?X1 + 0.2 * ?X2 =< 72 
+        & 150 * ?X1 + 25 * ?X2 =< 10000 
+        & ?Z + 1 = 250 * ?X1 + 45 * ?X2 
+        & 2 * [?Y1 + ?Y2] = ?X1 - 2
+        & ?Y2 = 7.3
+    ]; maximize [?Z + 5].
+)].
 
-system query [[res is ?X] (res is ?X.)].
+system query [[d ?Iterations] (
+    clpqr constraint [
+        ?Iterations > 0
+        ?Iterations * 604800 < 604801
+    ]; minimize [?Iterations].
+)].

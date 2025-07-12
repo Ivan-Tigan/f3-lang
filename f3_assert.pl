@@ -13,6 +13,7 @@
 :- use_module(builtins/pipe).
 :- use_module(builtins/clpfd).
 :- use_module(builtins/math).
+:- use_module(builtins/clpqr).
 
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
@@ -229,6 +230,7 @@ triple_string(p(A,B,C), S) :- node_string(A, As), node_string(B, Bs), node_strin
 node_string(N, S) :- string(N), atomic_list_concat(['"', N, '"'], '', S),!.
 node_string(N,S) :- atom(N), atom_string(N, S), !.
 node_string(N, S) :- number(N), number_string(N, S), !.
+node_string(N, S) :- var(N), atom_string('_UNBOUND_', S), !.
 node_string(Triple, S) :- triple_string(Triple, TS), atomic_list_concat(['{', ' ', TS, ' ', '}'], "", S), !.
 % node_string(graph(Triples), S) :- maplist(triple_string, Triples, Ss), atomic_list_concat(Ss, '\n', SG), atomic_list_concat(['(', SG, ')'], ' ', S), !.
 node_string(graph([]), S) :-
@@ -361,7 +363,7 @@ main([Arg1, Arg2]) :-
       )),
    close(Stream2),
    read_file_to_string(File2, Contents2, []),
-   format("Generated raw prolog:~n~w~n", [Contents2]),
+   % format("Generated raw prolog:~n~w~n", [Contents2]),
    consult(File2),
 
    forall((p(system, staticError, E)), (
