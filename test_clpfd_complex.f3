@@ -1,5 +1,0 @@
-// Test complex CLPFD expressions step by step
-system query [[X ?X Y ?Y] (
-    clpfd constraint [3 + 7 * ?Y = 45 & ?X in [20 60]].
-    clpfd label [?X ?Y].
-)].

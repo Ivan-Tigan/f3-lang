@@ -1,4 +1,0 @@
-// Test in constraint
-system query [[X ?X] (
-    clpfd constraint [?X in [20 60] & ?X = 25].
-)].

@@ -1,4 +1,0 @@
-// Simple test for new CLPFD syntax
-system query [[X ?X] (
-    clpfd constraint [?X = 42].
-)].
