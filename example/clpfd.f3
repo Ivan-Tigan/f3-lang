@@ -65,3 +65,11 @@ system query [[step X: ?X Y: ?Y Z: ?Z] (
         & ?X < ?Y & ?Y < ?Z
     ]; label [?X ?Y ?Z].  // Find one solution
 )].
+
+system query [[iteration ?Solutions] (
+    ?X = 10.
+    clpfd constraint [
+        ?X + [?Y * 3] = ?Z
+        & ?Z > 20 & ?Z < 30
+    ]; labels [[?Y ?Z] ?Solutions].  
+)].

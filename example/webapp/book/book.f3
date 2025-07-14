@@ -1,4 +1,4 @@
-system include "./f3auth.f3".
+system include "./f3auth.f3", "./time.f3".
 f3Auth encryptionSecretKey "Some secret key";
     clientId "0xdrjgnfvjdpn7wfgs1z2";
     clientSecret "CDlhWVPjoX0K6yZe9BDuajrRgEsbZ3DI";
@@ -86,7 +86,7 @@ fieldset[role='group'] input:last-child { border-top-right-radius: 0.375rem; bor
    </form>
    " ] sconcat ?HTML.
 ) => ( ?r tenantSubdomainForm ?HTML. ).
-// ?R tenantSubdomainForm "".
+?R tenantSubdomainForm "".
 
 ( 
    ?r match ( ?RID a post; path "/set-tenant-subdomain"; body ( subdomain = ?Subdomain. ); headers ( referer = ?referer.).);
@@ -186,24 +186,41 @@ fieldset[role='group'] input:last-child { border-top-right-radius: 0.375rem; bor
     ?Txn lmdbStartR "./db"; lmdbQuery { ?UserId calendar ?CalendarId. ?CalendarId name ?CalendarName. }; lmdbEnd [].
     system cut [].
     ["<a href='/calendar/" ?CalendarId "/create-event'><button>Create Event</button></a>"] sconcat ?CreateEventButton.
-    
+
+
+    system [now >> weekStart] ?WeekStartFake.
+    [?WeekStartFake 0] addDays ?WeekStart.
+    ?WeekStart [timeStampToString "%a, %d %b %Y %T GMT"] ?WeekStartStr.
+
+    [?WeekStart 14] addDays ?WeekEnd.
+    ?WeekEnd [timeStampToString "%a, %d %b %Y %T GMT"] ?WeekEndStr.
+
     ?Txn2 lmdbStartR "./db".
     [?EventRow (
-        ?Txn2 lmdbQuery { ?CalendarId event ?EventId. ?EventId name ?EventName; start ?EventStartT; frequency ?EventFrequency; duration ?DurationT. }.
+        ?Txn2 lmdbQuery { ?CalendarId event ?EventId. ?EventId name ?EventName; start ?EventStartTF; frequency ?EventFrequency; duration ?DurationT. }.
+        ?EventStartTF truncate ?EventStartT.
         ?EventStartT [timeStampToString "%a, %d %b %Y %T GMT"] ?EventStart.
         ?DurationT [timeStampToString "%H:%M"] ?Duration.
-        ["<tr><td>" ?EventName "</td><td>" ?EventStart "</td><td>" ?EventFrequency "</td><td>" ?Duration "</td></tr>"] sconcat ?EventRow.
+        clpfd constraint [
+             ?EventStartT + [?Iteration * 604800] = ?IterationTimeStamp
+            & ?IterationTimeStamp in ?WeekStart ?WeekEnd
+        ]; labels [[?Iteration ?IterationTimeStamp] ?AllIterations].
+        ?AllIterations toString ?AllIterationsStr.
+        ["<tr><td>" ?EventName "</td><td>" ?EventStart "</td><td>" ?EventFrequency "</td><td>" ?Duration "</td><td>" ?AllIterationsStr "</td></tr>"] sconcat ?EventRow.
     )] collect ?EventRows.
     ?Txn2 lmdbEnd [].
     ?EventRows sconcat ?EventRowsHTML.
     
-    ["<table>
+    ["
+    <h3>Events for the week " ?WeekStartStr " - " ?WeekEndStr "</h3>
+    <table>
     <thead>
         <tr>
             <th>Name</th>
             <th>Start</th>
             <th>Frequency</th>
             <th>Duration</th>
+            <th>Iterations</th>
             
         </tr>
     </thead>
@@ -298,9 +315,9 @@ fieldset[role='group'] input:last-child { border-top-right-radius: 0.375rem; bor
 
 
 system runWebServer 3000.
-system query [ ?XS ( 
-     [[?class :: ?s ?p ?o] ( ?txn lmdbStartR "./db"; lmdbQuery { ?s a ?class; ?p ?o. }; lmdbEnd [].  )] collect ?XS.
-)].
+// system query [ ?XS ( 
+//      [[?class :: ?s ?p ?o] ( ?txn lmdbStartR "./db"; lmdbQuery { ?s a ?class; ?p ?o. }; lmdbEnd [].  )] collect ?XS.
+// )].
 // system query [ [subdomain ?s ?Subdomain ?p ?o] ( 
 //      ?txn lmdbStartR "./db"; lmdbQuery { ?s tenantSubdomain ?Subdomain; ?p ?o. }; lmdbEnd []. 
 // )].

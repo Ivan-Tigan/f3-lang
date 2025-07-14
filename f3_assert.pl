@@ -38,6 +38,17 @@ load(DB) :-
 
 p(system, now, T) :- get_time(T).
 
+% Time parsing predicates
+p(TimeStampString, parseTimeStamp, TimeStamp) :- parse_time(TimeStampString, TimeStamp).
+p(TimeString, parseTime, Seconds) :- 
+    % Parse HH:MM format to seconds since midnight
+    atomic_list_concat([HourAtom, MinuteAtom], ':', TimeString),
+    atom_number(HourAtom, Hour),
+    atom_number(MinuteAtom, Minute),
+    Seconds is Hour * 3600 + Minute * 60.
+p(TimeStamp, [timeStampToString, Format], FormattedString) :- 
+    format_time(string(FormattedString), Format, TimeStamp).
+
 
 p(A, =, B) :- A = B.
 p(A, neq, B) :- p(system, log, ["QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ", test, A, not, equal, to, B]), A \= B.
