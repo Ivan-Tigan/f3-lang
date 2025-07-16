@@ -73,3 +73,30 @@ system query [[iteration ?Solutions] (
         & ?Z > 20 & ?Z < 30
     ]; labels [[?Y ?Z] ?Solutions].  
 )].
+
+0 factorial 1.
+(
+    clpfd constraint [
+        ?N > 0 & ?N1 = ?N - 1 & ?R = ?N * ?R1
+    ].
+    ?N1 factorial ?R1.
+) => ( ?N factorial ?R. ).
+
+system query [[factorial ?N] (
+    ?N factorial 6.
+)].
+
+
+0 fibonacci 0.
+1 fibonacci 1.
+(
+    clpfd constraint [
+        ?N > 1 & ?N1 = ?N - 1 & ?N2 = ?N - 2
+        & ?R = ?R1 + ?R2
+    ].
+    ?N1 [x cache fibonacci] ?R1.
+    ?N2 [x cache fibonacci] ?R2.
+) => ( ?N fibonacci ?R. ). 
+system query [[fibonacci ?N] (
+    60 fibonacci ?N.
+)].

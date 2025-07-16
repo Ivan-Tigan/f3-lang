@@ -59,10 +59,17 @@ p(A, =<, B) :- A =< B.
 p(system, log, X) :- node_string(X, S),!, format(user_error, "~w~n", [S]).
 p(system, log, X) :- format(user_error, "~q~n", [X]), !.
 p(X, toString, S) :- node_string(X, S).
+p(S, parseInteger, I) :- 
+    atom_string(S, Str),
+    atom_number(Str, I).
 % Iter builtin to match each element of a list
 p(List, iter, Element) :- 
     is_list(List),
     member(Element, List).
+
+p(List, length, Length) :- 
+    is_list(List),
+    length(List, Length).
 
 p(system, not, p(A,B,C)) :- \+ p(A,B,C).
 p(XS, sconcat, Res) :- atomics_to_string(XS, Res) .

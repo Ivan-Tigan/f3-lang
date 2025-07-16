@@ -68,20 +68,23 @@ constraint_expr(Constraint) -->
 
 % Global constraints: all_distinct([?X, ?Y, ?Z])
 constraint_expr(Constraint) -->
-    [all_distinct],
+    [X],
+    {\+ var(X), X = all_distinct},
     [List],
     { is_list(List), Constraint = all_distinct(List) }.
 
 % Global constraints: global_cardinality([?X, ?Y, ?Z], [1-2, 3-1])
 constraint_expr(Constraint) -->
-    [global_cardinality],
+    [X],
+    {\+ var(X), X = global_cardinality},
     [Vars],
     [Pairs],
     { is_list(Vars), is_list(Pairs), Constraint = global_cardinality(Vars, Pairs) }.
 
 % Sum constraint: sum([?X, ?Y, ?Z], #=, ?Total)
 constraint_expr(Constraint) -->
-    [sum],
+    [X],
+    {\+ var(X), X = sum},
     [Vars],
     comparison_op(Op),
     expression(Expr),
@@ -89,7 +92,8 @@ constraint_expr(Constraint) -->
 
 % Element constraint: element(?N, [10, 20, 30], ?Value)
 constraint_expr(Constraint) -->
-    [element],
+    [X],
+    {\+ var(X), X = element},
     expression(Index),
     [List],
     expression(Value),
@@ -126,6 +130,7 @@ mul_expr(Left, Result) -->
     { Result = (Left ^ Right) },
     mul_expr(Result, _).
 mul_expr(Result, Result) --> [].
+
 
 % ============================================================================
 % FACTOR PARSER - HANDLES FUNCTIONS, GROUPING, AND ATOMS

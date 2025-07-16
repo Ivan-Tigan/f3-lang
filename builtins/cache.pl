@@ -23,7 +23,7 @@ access_cache(Args, Operation, Result) :-
     cache(Args, Operation, Result, _),
     !,  % Cut to prevent backtracking if found
     % Update LRU timestamp
-    get_time(Now),
+    % get_time(Now),
     retractall(cache(Args, Operation, Result, _)),
     assertz(cache(Args, Operation, Result, Now)).
 
@@ -37,11 +37,8 @@ clear_cache :-
 
 
 user:p(A, [Key, cache, P], B) :-
-    access_cache(A, [Key, cache, P], B), !.
+    access_cache(A, [Key, cache, P], B),  !.
 user:p(A, [Key, cache, P], B) :-
     user:p(A, P, B), !,
-    write_cache(A, [Key, cache, P], B).
-user:p(A, [Key, cache, P], B) :-
-    user:p(A, P, C), !,
-    write_cache(A, [Key, cache, P], C).
-
+    write_cache(A, [Key, cache, P], B),
+    !.

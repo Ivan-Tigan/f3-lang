@@ -1,6 +1,7 @@
 // Unix timestamp manipulation library for F3
 
 // Constants as triples
+time secondsPerWeek 604800.
 time secondsPerDay 86400.
 time secondsPerHour 3600.
 time secondsPerMinute 60.
