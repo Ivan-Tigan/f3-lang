@@ -1,0 +1,69 @@
+(
+    ?WS match (
+        ?WSID a wsConnection;
+        path "/ws/game".
+    ).
+    // x x x.
+) => ( ?WS response (
+    ?WSID
+        status "accept";
+        headers ( 
+            "Sec-WebSocket-Protocol" = "game".
+        ).
+).).
+
+(
+    ?x1 [+ ?x2] ?x3.
+    ?y1 [+ ?y2] ?y3.
+) => (
+    [?x1 ?y1] [+ [?x2 ?y2]] [?x3 ?y3].
+).
+(
+    ?x1 [* ?scale] ?x2.
+    ?y1 [* ?scale] ?y2.
+) => (
+    [?x1 ?y1] [* ?scale] [?x2 ?y2].
+).
+
+(
+    ?x [^ 2] ?xsqd.
+    ?y [^ 2] ?ysqd.
+    ?xsqd [+ ?ysqd] ?lsqd.
+    ?lsqd sqrt ?l.
+) => ([?x ?y] length ?l.).
+(
+    [?x1 ?y1] length ?l.
+    ?x1 [/ ?l] ?x2.
+    ?y1 [/ ?l] ?y2.
+) => (
+    [?x1 ?y1] normalized [?x2 ?y2].
+).
+
+(
+    ?GameState match (?G step ?N; players {| ?Player position ?PlayerPosition. |}.).
+    ?GameState toString ?S.
+    ?N < 1000.
+     (?WS a wsConnection; path "/ws/game".) wsSend (
+        type = "message".
+        sender = "Hi".
+        content = ?S.
+        timestamp = "2023-03-03".
+    ).
+    ?N [+ 1] ?SN.
+    system sleep 0.03.
+    [0.5 1.0] [normalized >> [* 0.03] >> [+ ?PlayerPosition]] ?SP1.
+    system log [game step ?N ?Player  ?SP1].
+    (?G step ?SN; players {| ?Player position ?SP1. |}.) gameloop [].
+) => (
+    ?GameState gameloop [].
+).
+
+system runWebServer 3000.
+
+system query [[] (
+
+    ?ThreadId startThread (
+
+        (game1 step 0; players {| player1 position [0.0 0.0]. player2 position [10.0 10.0]. |}.) gameloop [].
+    ).
+)].

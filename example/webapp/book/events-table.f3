@@ -1,0 +1,94 @@
+(
+    ?R match ( ?RID a get; path ?Path. )
+    ; [f3AuthSession >> match] ( sub = ?UserId. ).
+    
+    
+    ?Path [splitString "/"] ["" "calendar" ?CalendarId].
+    ?Txn lmdbStartR "./db"
+    ; lmdbQuery { ?UserId calendar ?CalendarId. ?CalendarId name ?CalendarName. }
+    ; lmdbEnd [].
+    system cut [].
+    system [now >> weekStart] ?WeekStart.
+    ?WeekStart [timeStampToString "%a, %d %b %Y %T GMT"] ?WeekStartStr.
+
+    [?WeekStart 7] addDays ?WeekEnd.
+    ?WeekEnd [timeStampToString "%a, %d %b %Y %T GMT"] ?WeekEndStr.
+    time secondsPerDay ?SecondsPerDay; secondsPerWeek ?SecondsPerWeek.
+    clpfd constraint [
+        ?WeekStart + ?DayIteration * ?SecondsPerDay  = ?DayIterationTimeStamp
+        & ?DayIterationTimeStamp in ?WeekStart ?WeekEnd
+    ].
+    ?Txn2 lmdbStartR "./db".
+    [?DayColumn (
+        clpfd label [?DayIterationTimeStamp].
+        ?DayIterationTimeStamp [timeStampToString "%a, %d %b %Y"] ?DayColumnHeaderTimestamp.
+    
+        [?EventRow (
+            ?Txn2 lmdbQuery { 
+                ?CalendarId event ?EventId. 
+                ?EventId name ?EventName
+                ; start ?EventStartTF
+                ; frequency ?EventFrequency
+                ; duration ?DurationT
+                ; capacity ?Capacity. 
+            }.
+            ?EventStartTF truncate ?EventStartT.
+            ?EventStartT [timeStampToString "%a, %d %b %Y %T GMT"] ?EventStart.
+            ?DurationT [timeStampToString "%H:%M"] ?Duration.
+            clpfd constraint [
+                ?EventStartT + ?Iteration * ?SecondsPerWeek = ?IterationTimeStamp
+                & ?IterationTimeStamp in ?WeekStart ?WeekEnd
+            ].
+            clpfd label [?Iteration ?IterationTimeStamp].
+            ?IterationTimeStamp dayStart ?DayIterationTimeStamp; [timeStampToString "%H:%m"] ?IterationTimeStampStr.
+            ?IterationTimeStamp [+ ?DurationT] ?EventEndT.
+            ?EventEndT [timeStampToString "%H:%m"] ?EventEnd.
+            [?Booking (
+                ?Txn2 lmdbQuery { 
+                    ?Booking a Booking
+                    ; event ?EventId
+                    ; iteration ?Iteration. 
+                }.
+                system not {
+                    ?Txn2 lmdbQuery { ?Booking cancelled ?CancelledTime. }.
+                }.
+            )] [collect >> length] ?Bookings.
+
+            ["<div style='display: flex; justify-content: space-between; flex-direction:column; '>
+            <div style='display: flex; justify-content: space-between;'>
+                <div>" ?IterationTimeStampStr " - " ?EventEnd "</div> 
+                <div style='display: flex; justify-content: flex-end;'>" ?Bookings "/" ?Capacity "</div>
+            </div>
+            <div style='display: flex; justify-content: space-between;'>
+                <div>" ?EventName "</div>
+                <div>
+                    <a href='/event/" ?EventId "/" ?Iteration "/book'>Book</a>
+                    <a href='/event/" ?EventId "/" ?Iteration "/bookings'>Bookings</a>
+                    <a href='/event/" ?EventId "/" ?Iteration "/edit'>Edit</a>
+                </div>
+            </div>
+            </div>
+            
+            "] sconcat ?EventRow.
+        )] [collect >> sconcat] ?EventRows.
+        ["<div><div>" ?DayColumnHeaderTimestamp "</div><div>" ?EventRows "</div></div>"] sconcat ?DayColumn.
+    )] [collect >> sconcat] ?DayColumns.
+    ?Txn2 lmdbEnd [].
+    ["
+    <style>
+        .column-stack { display: flex; flex-direction: column; }
+        .column-stack.horizontal { flex-direction: row; overflow-x: auto; min-width: 100%; }
+        .column-stack.auto { flex-direction: column; }
+        @media (min-width: 768px) { .column-stack.auto { flex-direction: row; } }
+        .column-stack > div { border: 1px solid #ccc; }
+        .column-stack.horizontal > div { flex: 0 0 200px; min-width: 200px; }
+        .column-stack.auto > div { flex: 1; min-width: 0; }
+        .column-stack:not(.horizontal):not(.auto) > div { flex: 1; min-width: 0; }
+        .column-stack > div > div:first-child { background-color: #eee; font-weight: bold; padding: 10px; }
+        .column-stack > div > div:last-child { display: flex; flex-direction: column; }
+        .column-stack > div > div:last-child > div { padding: 10px; border-bottom: 1px solid #eee; }
+        .column-stack > div > div:last-child > div:last-child { border-bottom: none; } 
+    </style>
+
+    <div class='column-stack'>" ?DayColumns "</div>"] sconcat ?EventsTableHTML.
+) => (?R eventsTable ?EventsTableHTML.).

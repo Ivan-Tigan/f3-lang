@@ -11,31 +11,31 @@ time secondsPerMinute 60.
 ( 
     ?Timestamp floor ?TimestampSeconds.
     time secondsPerDay ?SecondsPerDay.
-    [?TimestampSeconds ?SecondsPerDay] floordiv ?Days.
-    [?Days 3] + ?DaysOffset.
-    [?DaysOffset 7] mod ?Weekday.
+    ?TimestampSeconds [floordiv ?SecondsPerDay] ?Days.
+    ?Days [+ 3] ?DaysOffset.
+    ?DaysOffset [mod 7] ?Weekday.
 ) => ( ?Timestamp weekday ?Weekday. ).
 
 // Get start of day (nullify hours/minutes/seconds)
 ( 
     ?Timestamp floor ?TimestampSeconds.
     time secondsPerDay ?SecondsPerDay.
-    [?TimestampSeconds ?SecondsPerDay] floordiv ?Days.
-    [?Days ?SecondsPerDay] * ?DayStart.
+    ?TimestampSeconds [floordiv ?SecondsPerDay] ?Days.
+    ?Days [* ?SecondsPerDay] ?DayStart.
 ) => ( ?Timestamp dayStart ?DayStart. ).
 
 // Add days to timestamp
 ( 
     time secondsPerDay ?SecondsPerDay.
-    [?Days ?SecondsPerDay] * ?DaySeconds.
-    [?Timestamp ?DaySeconds] + ?Result.
+    ?Days [* ?SecondsPerDay] ?DaySeconds.
+    ?Timestamp [+ ?DaySeconds] ?Result.
 ) => ( [?Timestamp ?Days] addDays ?Result. ).
 
 // Subtract days from timestamp
 ( 
     time secondsPerDay ?SecondsPerDay.
-    [?Days ?SecondsPerDay] * ?DaySeconds.
-    [?Timestamp ?DaySeconds] - ?Result.
+    ?Days [* ?SecondsPerDay] ?DaySeconds.
+    ?Timestamp [- ?DaySeconds] ?Result.
 ) => ( [?Timestamp ?Days] subDays ?Result. ).
 
 // Get start of week (Monday = 0)
@@ -50,8 +50,8 @@ time secondsPerMinute 60.
     ?Timestamp floor ?TimestampSeconds.
     time secondsPerHour ?SecondsPerHour.
     ?TimestampSeconds dayStart ?DayStart.
-    [?TimestampSeconds ?DayStart] - ?SecondsInDay.
-    [?SecondsInDay ?SecondsPerHour] floordiv ?Hour.
+    ?TimestampSeconds [- ?DayStart] ?SecondsInDay.
+    ?SecondsInDay [floordiv ?SecondsPerHour] ?Hour.
 ) => ( ?Timestamp hour ?Hour. ).
 
 // Get minute from timestamp
@@ -60,9 +60,9 @@ time secondsPerMinute 60.
     time secondsPerHour ?SecondsPerHour.
     time secondsPerMinute ?SecondsPerMinute.
     ?TimestampSeconds dayStart ?DayStart.
-    [?TimestampSeconds ?DayStart] - ?SecondsInDay.
-    [?SecondsInDay ?SecondsPerHour] mod ?SecondsInHour.
-    [?SecondsInHour ?SecondsPerMinute] floordiv ?Minute.
+    ?TimestampSeconds [- ?DayStart] ?SecondsInDay.
+    ?SecondsInDay [mod ?SecondsPerHour] ?SecondsInHour.
+    ?SecondsInHour [floordiv ?SecondsPerMinute] ?Minute.
 ) => ( ?Timestamp minute ?Minute. ).
 
 // Get second from timestamp
@@ -70,30 +70,30 @@ time secondsPerMinute 60.
     ?Timestamp floor ?TimestampSeconds.
     time secondsPerMinute ?SecondsPerMinute.
     ?TimestampSeconds dayStart ?DayStart.
-    [?TimestampSeconds ?DayStart] - ?SecondsInDay.
-    [?SecondsInDay ?SecondsPerMinute] mod ?Second.
+    ?TimestampSeconds [- ?DayStart] ?SecondsInDay.
+    ?SecondsInDay [mod ?SecondsPerMinute] ?Second.
 ) => ( ?Timestamp second ?Second. ).
 
 // Add hours to timestamp
 ( 
     time secondsPerHour ?SecondsPerHour.
-    [?Hours ?SecondsPerHour] * ?HourSeconds.
-    [?Timestamp ?HourSeconds] + ?Result.
+    ?Hours [* ?SecondsPerHour] ?HourSeconds.
+    ?Timestamp [+ ?HourSeconds] ?Result.
 ) => ( [?Timestamp ?Hours] addHours ?Result. ).
 
 // Add minutes to timestamp
 ( 
     time secondsPerMinute ?SecondsPerMinute.
-    [?Minutes ?SecondsPerMinute] * ?MinuteSeconds.
-    [?Timestamp ?MinuteSeconds] + ?Result.
+    ?Minutes [* ?SecondsPerMinute] ?MinuteSeconds.
+    ?Timestamp [+ ?MinuteSeconds] ?Result.
 ) => ( [?Timestamp ?Minutes] addMinutes ?Result. ).
 
 // Check if timestamp is same day
 ( 
     ?Timestamp1 dayStart ?Day1.
     ?Timestamp2 dayStart ?Day2.
-    [?Day1 ?Day2] = ?Result.
-) => ( [?Timestamp1 ?Timestamp2] sameDay ?Result. ).
+    ?Day1  = ?Day2.
+) => ( [?Timestamp1 ?Timestamp2] sameDay []. ).
 
 // Format weekday name (Monday = 0)
 0 weekdayName "Monday".

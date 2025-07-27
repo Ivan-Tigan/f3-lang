@@ -14,6 +14,7 @@
 :- use_module(builtins/clpfd).
 :- use_module(builtins/math).
 :- use_module(builtins/clpqr).
+:- use_module(builtins/file).
 
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
@@ -35,6 +36,11 @@ load(DB) :-
     ).
 
 
+
+p(system, sleep, T) :- sleep(T).
+
+p(ThreadId, startThread, graph(G)) :-
+ list_to_conjunction(G, C), thread_create(C, ThreadId, []).
 
 p(system, now, T) :- get_time(T).
 
@@ -72,6 +78,11 @@ p(List, length, Length) :-
     length(List, Length).
 
 p(system, not, p(A,B,C)) :- \+ p(A,B,C).
+p(graph(G1), or, graph(G2)) :- 
+    list_to_conjunction(G1, Conjunction1),
+    list_to_conjunction(G2, Conjunction2),
+    (Conjunction1 -> true; Conjunction2).
+
 p(XS, sconcat, Res) :- atomics_to_string(XS, Res) .
 p(S, [splitString, Separator], Res) :- 
    atom_string(S, SStr),

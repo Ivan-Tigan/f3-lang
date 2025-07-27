@@ -46,6 +46,10 @@ handle_request(Request) :-
        -> read_form_request(Request, FormData),
           format(user_error, "Parsed form body: ~w~n", [FormData]),
           form_data_to_triples(FormData, BodyTriples)
+       ;  sub_atom(ContentType, 0, _, _, 'multipart/form-data')
+       -> read_multipart_request(Request, MultipartData),
+          format(user_error, "Parsed multipart body: ~w~n", [MultipartData]),
+          multipart_data_to_triples(MultipartData, BodyTriples)
        ;  format(user_error, "Unsupported content type: ~w~n", [ContentType]),
           BodyTriples = []
        ),
@@ -191,6 +195,81 @@ form_data_to_triples(FormData, Triples) :-
 % Convert a form field to a triple
 form_pair_to_triple(Name=Value, p(Name, =, Value)).
 
+% Read multipart form data from request using SWI-Prolog built-in
+read_multipart_request(Request, MultipartData) :-
+    format(user_error, "Reading multipart request~n", []),
+    catch(
+        http_read_data(Request, MultipartData, [form_data(mime)]),
+        Error,
+        (format(user_error, "Multipart parse error: ~w~n", [Error]), MultipartData = [])
+    ),
+    format(user_error, "Parsed multipart data: ~w~n", [MultipartData]).
+
+% Convert multipart data to triples format
+multipart_data_to_triples(MultipartData, Triples) :-
+    maplist(multipart_mime_to_triple, MultipartData, Triples).
+
+% Convert a multipart MIME field to a triple
+multipart_mime_to_triple(mime(Properties, Value, []), p(Name, =, ProcessedValue)) :-
+    % Extract the field name from properties
+    (memberchk(name(Name), Properties) -> true ; Name = unknown),
+    % Check if this is a file upload
+    (memberchk(filename(Filename), Properties) ->
+        % This is a file upload - convert string to byte array
+        (atom(Value) ->
+            atom_codes(Value, ByteArray)
+        ; string(Value) ->
+            string_codes(Value, ByteArray)
+        ; is_list(Value) ->
+            ByteArray = Value
+        ; ByteArray = []
+        ),
+        % Create structured value with byte array
+        ProcessedValue = graph([
+            p(filename, =, Filename),
+            p(content, =, ByteArray)
+        ])
+    ;   % Regular form field - keep as string
+        ProcessedValue = Value
+    ),
+    format(user_error, "Processed field ~w with value type ~w~n", [Name, ProcessedValue]).
+
+
+% Helper to read all bytes from a stream
+read_all_bytes_from_stream(Stream, Bytes) :-
+    read_all_bytes_from_stream(Stream, [], Bytes).
+
+read_all_bytes_from_stream(Stream, Acc, Bytes) :-
+    get_byte(Stream, Byte),
+    (   Byte == -1
+    ->  reverse(Acc, Bytes)
+    ;   read_all_bytes_from_stream(Stream, [Byte|Acc], Bytes)
+    ).
+
+% Process multipart values - now handles SWI-Prolog's built-in format
+process_multipart_value(Value, Value) :-
+    % Regular form fields are already in the right format
+    atomic(Value), !.
+process_multipart_value(file(Filename, TempFile), ProcessedValue) :-
+    !, % Handle file uploads
+    % Read the temporary file content
+    catch(
+        (open(TempFile, read, Stream, [type(binary)]),
+         read_all_bytes_from_stream(Stream, FileBytes),
+         close(Stream),
+         ProcessedValue = graph([
+             p(filename, =, Filename),
+             p(content, =, FileBytes)
+         ])),
+        Error,
+        (format(user_error, "File read error: ~w~n", [Error]),
+         ProcessedValue = graph([
+             p(filename, =, Filename),
+             p(error, =, Error)
+         ]))
+    ).
+process_multipart_value(Value, Value).
+
 % Convert a JSON key-value pair to a triple
 json_pair_to_triple(Key-Value, p(Key, =, ProcessedValue)) :-
     process_json_value(Value, ProcessedValue).
@@ -335,11 +414,7 @@ send_http_response(graph(ResponseTriples)) :-
         format(user_error, "Using default content type~n", [])
     ),
     
-    % Use body content directly as string
-    format(user_error, "Using body content directly as string~n", []),
-    ProcessedBody = BodyContent,
-    
-    % Send response headers
+    % **SEND HEADERS FIRST**
     format('Status: ~w~n', [Status]),
     format('Content-Type: ~w~n', [ContentType]),
     
@@ -350,9 +425,18 @@ send_http_response(graph(ResponseTriples)) :-
     % Separate headers from body
     nl,
     
-    % Send body
-    format(user_error, "Sending response body~n", []),
-    write(ProcessedBody),
+    % **THEN SEND BODY**
+    (   is_list(BodyContent)
+    ->  % This is a byte list for binary content
+        format(user_error, "Converting byte list to binary~n", []),
+        maplist(put_byte, BodyContent),
+        format(user_error, "Binary content sent~n", [])
+    ;   % Regular text content
+        format(user_error, "Sending text content~n", []),
+        write(BodyContent),
+        format(user_error, "Text content sent~n", [])
+    ),
+    
     format(user_error, "Response complete~n", []).
 
 % Process JSON value for output
