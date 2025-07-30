@@ -26,10 +26,10 @@ query is sql:["select * from " table " where size > " 30].
 
 [05:03:2025 12:00:00 UTC] a timestamp.
 
-system query [[?res ?res2] (
+system query [[?res ?res2 ?res3 ?res4] (
     use mod ?mod.
     [1 2 3] ?mod:sum3 ?res.
     10:meters [/ 40:seconds] ?res2.
-
-
+    query is sql:?res3.
+    [05:?res4 12:00:00 UTC] a timestamp.
 )].

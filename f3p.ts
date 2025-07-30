@@ -158,7 +158,9 @@ const nodeToProlog = (node: Node): string => {
     : Array.isArray(node)
     ? `[${node.map(nodeToProlog).join(", ")}]`
     : "type" in node && node.type === "chain"
-    ? `chain([${node.nodes.map(nodeToProlog).join(", ")}])`
+    ? (node.nodes.reduceRight(
+        (acc, curr) => `chain(${nodeToProlog(curr)}, ${nodeToProlog(acc)})`
+      ) as string)
     : "type" in node && node.type === "graph"
     ? `graph([${node.triples.map(nodeToProlog).join(", ")}])`
     : "s" in node && "p" in node && "o" in node

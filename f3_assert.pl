@@ -291,10 +291,10 @@ node_string(graph(Triples), S) :-
     atomic_list_concat(['(\n', SG, '\n)'], '', S), !.
 
 
-node_string(chain(XS), S) :- 
-    is_list(XS),
-    maplist(node_string, XS, SS),
-    atomic_list_concat(SS, ':', S), !.
+node_string(chain(X, Xs), S) :- 
+    node_string(X, R),
+    node_string(Xs, Rs),
+    atomic_list_concat([R, Rs], ':', S), !.
 node_string(XS, S) :- 
     is_list(XS),
     maplist(node_string, XS, SS),
