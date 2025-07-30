@@ -567,7 +567,7 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
 
 system runWebServer 3000.
 system query [ ?XS ( 
-     [[?class :: ?s ?p ?o] (?class = Booking. ?txn lmdbStartR "./db"; lmdbQuery { ?s a ?class; ?p ?o. }; lmdbEnd [].  )] collect ?XS.
+     [[?class -- ?s ?p ?o] (?class = Booking. ?txn lmdbStartR "./db"; lmdbQuery { ?s a ?class; ?p ?o. }; lmdbEnd [].  )] collect ?XS.
 )].
 // system query [ [subdomain ?s ?Subdomain ?p ?o] ( 
 //      ?txn lmdbStartR "./db"; lmdbQuery { ?s tenantSubdomain ?Subdomain; ?p ?o. }; lmdbEnd []. 

@@ -1,4 +1,4 @@
-system query [[X1: ?X1 X2: ?X2 Z: ?Z Y1: ?Y1 Y2: ?Y2] (
+system query [[X1 ?X1 X2 ?X2 Z ?Z Y1 ?Y1 Y2 ?Y2] (
     clpqr constraint [
         ?X1 + 0.2 * ?X2 =< 72 
         & 150 * ?X1 + 25 * ?X2 =< 10000 

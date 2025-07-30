@@ -10,7 +10,8 @@ const semicolon = P.string(";").trim(ws);
 
 // const pNumber = P.regexp(/[0-9]+/).map(r => parseInt(r)).desc("number");
 const pNumber = P.regexp(/[-]?[0-9]+(?:\/[0-9]+|\.[0-9]+)?/).desc("number");
-const pIdentifier = P.regexp(/[a-zA-Z:_][a-zA-Z0-9:_-]*/).desc("identifier");
+const pIdentifier = P.regexp(/[a-zA-Z_][a-zA-Z0-9_-]*/).desc("identifier");
+// const pIdentifier = P.regexp(/[a-zA-Z:_][a-zA-Z0-9:_-]*/).desc("identifier");
 const pVar = P.regexp(/[?][a-zA-Z0-9_]*/).desc("variable");
 // const pSymbol = P.regexp(/[+-=*/^<>~!?|&]+/).desc("symbol");
 const pSymbol = P.regexp(/([+\-=*/^<>~!&]|(?!\[|)(?!\|])\|)+/).desc("symbol");
@@ -37,6 +38,7 @@ type Node =
   | string
   | number
   | Node[]
+  | { type: "chain"; nodes: Node[] }
   | { type: "graph"; triples: Node[] }
   | Triple;
 const nestArray = <T>(arr: T[]): [T, T] | [any, T] => {
@@ -66,13 +68,22 @@ const pNormalList: P.Parser<Node[]> = P.string("[")
   )
   .skip(ws.then(P.string("]")));
 const pList: P.Parser<Node[]> = P.alt(pLinkedList, pNormalList);
+const pChain: P.Parser<{ type: "chain"; nodes: Node[] }> = P.sepBy1(
+  P.lazy(() => pNodeNoChain),
+  P.string(":")
+)
+  .chain((xs) =>
+    xs.length > 1 ? P.succeed(xs) : P.fail("Expected chain with length > 1")
+  )
+  .map((nodes) => ({ type: "chain", nodes }));
+
 const pGraph = P.string("(")
   .skip(ws)
   .then(P.lazy(() => pTriples()))
   .skip(ws.then(P.string(")")))
   .map((triples) => ({ type: "graph", triples }));
 
-const pNode: P.Parser<Node> = P.alt(
+const pNodeNoChain: P.Parser<Node> = P.alt(
   pString,
   pNumber,
   pIdentifier,
@@ -81,6 +92,8 @@ const pNode: P.Parser<Node> = P.alt(
   pGraph,
   pSymbol
 );
+const pNode: P.Parser<Node> = P.alt(pChain, pNodeNoChain);
+
 const pO = (s?: Node): P.Parser<{ o: Node }[] | { tripleTree: Triple }[]> =>
   P.alt(
     P.string("{|")
@@ -144,6 +157,8 @@ const nodeToProlog = (node: Node): string => {
     ? `${node}`
     : Array.isArray(node)
     ? `[${node.map(nodeToProlog).join(", ")}]`
+    : "type" in node && node.type === "chain"
+    ? `chain([${node.nodes.map(nodeToProlog).join(", ")}])`
     : "type" in node && node.type === "graph"
     ? `graph([${node.triples.map(nodeToProlog).join(", ")}])`
     : "s" in node && "p" in node && "o" in node

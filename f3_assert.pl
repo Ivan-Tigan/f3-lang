@@ -15,6 +15,9 @@
 :- use_module(builtins/math).
 :- use_module(builtins/clpqr).
 :- use_module(builtins/file).
+:- use_module(builtins/regex).
+% :- use_module(builtins/'list-parser').
+:- use_module(builtins/lambda).
 
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
@@ -35,8 +38,15 @@ load(DB) :-
         assertz(loaded(DB))
     ).
 
-
-
+p(X, a, atom) :- atom(X).
+p(X, a, var) :- var(X).
+p(X, a, number) :- number(X).
+p(X, a, integer) :- integer(X).
+p(X, a, string):- string(X).
+p(X, a, list) :- is_list(X).
+p(X, a, nonvar) :- nonvar(X).
+p([H|_], head, H).
+p([_|T], tail, T).
 p(system, sleep, T) :- sleep(T).
 
 p(ThreadId, startThread, graph(G)) :-
@@ -62,6 +72,7 @@ p(A, >, B) :- A > B.
 p(A, <, B) :- A < B.
 p(A, >=, B) :- A >= B.
 p(A, =<, B) :- A =< B.
+p(Ns, sum, Sum) :- sum_list(Ns, Sum).
 p(system, log, X) :- node_string(X, S),!, format(user_error, "~w~n", [S]).
 p(system, log, X) :- format(user_error, "~q~n", [X]), !.
 p(X, toString, S) :- node_string(X, S).
@@ -228,7 +239,7 @@ process_rule(p(graph(G1), =>, graph(G2)), Stream) :-
 transform_condition(p(system,cut,[]), !) :- !. 
 transform_condition(p(system,fail,[]), fail) :- !. 
 
-transform_condition(p(S,P,O), p(S,P,O)).
+transform_condition(X,X).
 
 % Convert list of conditions to conjunction, transforming builtins
 list_to_conjunction([], true).
@@ -237,10 +248,12 @@ list_to_conjunction([Cond], TransformedCond) :- !,
 list_to_conjunction([Cond|Conds], (TransformedCond, Rest)) :-
    transform_condition(Cond, TransformedCond),
    list_to_conjunction(Conds, Rest).
-
+l2c([], true).
+l2c([p(system, P, [])|Xs], (!, Y)) :- nonvar(P), P = cut, !, l2c(Xs, Y).
+l2c([X|Xs], (X, Y)) :- l2c(Xs, Y).
 % Build rule with transformed conditions 
 build_rule(Head, ConditionsList, Rule) :-
-   list_to_conjunction(ConditionsList, Body),
+   l2c(ConditionsList, Body),
    Rule = (Head :- Body).
 
 % Query that skips builtins and rules but allows derived facts
@@ -259,7 +272,7 @@ triple_string(p(A,B,C), S) :- node_string(A, As), node_string(B, Bs), node_strin
 node_string(N, S) :- string(N), atomic_list_concat(['"', N, '"'], '', S),!.
 node_string(N,S) :- atom(N), atom_string(N, S), !.
 node_string(N, S) :- number(N), number_string(N, S), !.
-node_string(N, S) :- var(N), atom_string('_UNBOUND_', S), !.
+node_string(N, S) :- var(N), format(string(S), "~q", N), !.
 node_string(Triple, S) :- triple_string(Triple, TS), atomic_list_concat(['{', ' ', TS, ' ', '}'], "", S), !.
 % node_string(graph(Triples), S) :- maplist(triple_string, Triples, Ss), atomic_list_concat(Ss, '\n', SG), atomic_list_concat(['(', SG, ')'], ' ', S), !.
 node_string(graph([]), S) :-
@@ -278,6 +291,10 @@ node_string(graph(Triples), S) :-
     atomic_list_concat(['(\n', SG, '\n)'], '', S), !.
 
 
+node_string(chain(XS), S) :- 
+    is_list(XS),
+    maplist(node_string, XS, SS),
+    atomic_list_concat(SS, ':', S), !.
 node_string(XS, S) :- 
     is_list(XS),
     maplist(node_string, XS, SS),
@@ -366,11 +383,14 @@ main([Arg1, Arg2]) :-
    write(Stream, ':- dynamic p/3.\n\n'),
    % listing(p),
    forall(clause(p(A, B, C), true),
-      (retract(p(A, B, C)),  % Remove from memory to avoid duplicates
+      (retract(p(A, B, C)),   % Remove from memory to avoid duplicates
+     
+         % format(user_error, "~n Processing fact ~q ~n", [p(A, B, C)]  ),
       (p(A,B,C) = p(graph(G1), => ,graph(G2)) -> 
-         forall(member(M, G2), (
-               build_rule(M, G1, Rule),
-               % format('Creating rule: ~w~n', [Rule]),
+         forall(member(p(PS,PP,PO), G2), (
+               build_rule(p(PS,PP,PO), G1, Rule),
+         % format(user_error, "~n 222 Processing fact ~q ~n", [p(A, B, C)]  ),
+               % format('Creating rule: ~q~n', [Rule]),
                %  assertz(Rule)
                format(Stream, '~q.~n', [Rule])
             ))
@@ -384,6 +404,27 @@ main([Arg1, Arg2]) :-
    % load_files(File, [dynamic(true)]).  % Use load_files with dynamic option
 
    consult(File),
+   
+   % now inferred rules
+   tmp_file_stream(text, FileInferred, StreamInferred),
+   
+   forall(p(graph(GI1), => ,graph(GI2)), (
+      % format(user_error, "Found inferred rule ~q ~n", [p(graph(GI1), => ,graph(GI2))]),
+      % (retract(p(graph(GI1), => ,graph(GI2))) -> true; true),
+      forall(member(PI, GI2), (
+               build_rule(PI, GI1, RuleI),
+         % format(user_error, "~n 222 Processing fact ~q ~n", [p(graph(GI1), => ,graph(GI2))]  ),
+               % format('Creating rule: ~q~n', [RuleI]),
+               %  assertz(Rule)
+               format(StreamInferred, '~q.~n', [RuleI])
+            ))
+   )),
+   % forall(p(graph(G1), => ,graph(G2)), (
+      % (retract(p(graph(G1), => ,graph(G2))) -> true; true))),
+   close(StreamInferred),
+   % read_file_to_string(FileInferred, ContentsInferred, []),
+   % format("Generated inferred rules:~n~w~n", [ContentsInferred]),
+   consult(FileInferred),
 
    tmp_file_stream(text, File2, Stream2),
    forall((p(system, rawProlog, E)), (

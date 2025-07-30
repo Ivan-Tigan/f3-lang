@@ -2,13 +2,13 @@
 // Demonstrates the unified syntax for constraint solving
 
 // Example 1: Basic arithmetic with domain constraints
-system query [[basic X: ?X Y: ?Y] (
+system query [[basic X ?X Y ?Y] (
     clpfd constraint [?X + ?Y = 10 & ?X in 1 5 & ?Y in 3 8]; 
     label [?X ?Y].
 )].
 
 // Example 2: Multiple variables with shared domain
-system query [[multi A: ?A B: ?B C: ?C] (
+system query [[multi A ?A B ?B C ?C] (
     clpfd constraint [?A ?B ?C ins 1 3 & ?A + ?B + ?C = 6 & ?A neq ?B]; label [?A ?B ?C].
 )].
 
@@ -23,7 +23,7 @@ system query [[complex solutions ?AllSolutions] (
 )].
 
 // Example 4: Inequality constraints
-system query [[inequality X: ?X Y: ?Y] (
+system query [[inequality X ?X Y ?Y] (
     clpfd constraint [?X * ?Y < 20 & ?X > ?Y & ?X in 2 8 & ?Y in 1 5]; 
     label [?X ?Y].
 )].
@@ -39,7 +39,7 @@ system query [[schedule solutions ?AllSolutions] (
 )].
 
 // Example 6: Resource allocation - distribute items among containers
-system query [[allocation C1: ?C1 C2: ?C2 C3: ?C3] (
+system query [[allocation C1 ?C1 C2 ?C2 C3 ?C3] (
     clpfd constraint [
         ?C1 + ?C2 + ?C3 = 15    // Total 15 items to distribute
         & ?C1 >= 3 & ?C2 >= 2   // Minimum requirements
@@ -49,7 +49,7 @@ system query [[allocation C1: ?C1 C2: ?C2 C3: ?C3] (
 )].
 
 // Example 7: Number puzzle - find digits that satisfy equation
-system query [[puzzle A: ?A B: ?B C: ?C] (
+system query [[puzzle A ?A B ?B C ?C] (
     clpfd constraint [
         ?A ?B ?C ins 1 9        // Single digits 1-9
         & ?A * 10 + ?B + ?C = 25 // Two-digit number AB plus C equals 25
@@ -58,7 +58,7 @@ system query [[puzzle A: ?A B: ?B C: ?C] (
 )].
 
 // Example 8: Step-by-step solving (non-exhaustive search)
-system query [[step X: ?X Y: ?Y Z: ?Z] (
+system query [[step X ?X Y ?Y Z ?Z] (
     clpfd constraint [
         ?X + 2 * ?Y + 3 * ?Z = 20
         & ?X ?Y ?Z ins 1 8

@@ -1,0 +1,35 @@
+(import mod1 ?prefix.) => (
+
+(
+    [?x ?y ?z] sum ?res.
+) => (
+    [?x ?y ?z] ?prefix:sum3 ?res.
+).
+).
+
+(import mod2 ?prefix.) => (
+
+(
+    ?x [[+ ?y] >> [+ ?z] >> [+ 1]] ?res.
+) => (
+    [?x ?y ?z] ?prefix:sum3 ?res.
+).
+).
+import mod1 mod1; mod2 othermod.
+use mod othermod.
+
+query is sql:["select * from " table " where size > " 30].
+
+(
+    ?x [/ ?y] ?z.
+) => (?x:?unit1 [/ ?y:?unit2] ?z:[?unit1 / ?unit2].). 
+
+[05:03:2025 12:00:00 UTC] a timestamp.
+
+system query [[?res ?res2] (
+    use mod ?mod.
+    [1 2 3] ?mod:sum3 ?res.
+    10:meters [/ 40:seconds] ?res2.
+
+
+)].

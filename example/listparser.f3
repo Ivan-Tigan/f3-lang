@@ -1,0 +1,133 @@
+
+( ?name <-- ?value.) => ( (?i ?value ?o. system cut [].) => (?i ?name ?o.). ).
+( ?name <- ?value.) => ( (?i ?value ?o.) => (?i ?name ?o.). ).
+
+
+?x id ?x.
+?v pure [ fun [?s ?k] -> ([success ?v ?s] ?k ?o.) return ?o ].
+[fun ?i -> ?g return ?o] <- [?i ?g ?o].
+[?f1 or ?f2] <-- ?f1.
+[?f1 or ?f2] <- ?f2.
+
+// y <- [fun ?f -> ( 
+//         ?left = [fun ?x1 -> ( ?x1 [?x1 >> ?f] ?r1.) return ?r1]. 
+//         system log z1.
+//         ?right = [fun ?x2 -> ( ?x2 [?x2 >> ?f] ?r2.) return ?r2].
+//         system log z2.
+//         ?right ?left ?r.
+//         system log z3.
+//     ) return ?r].
+(?a ?f1 ?r1. ?a ?f2 ?r2.) => (?a [fanout ?f1 ?f2] [?r1 ?r2].).
+
+( ?x ?f ?y.) => ( [?x] [map ?f] [?y].).
+(
+    ?xs head ?x. ?xs tail ?rest.
+     ?x ?f ?y.
+    ?rest [map ?f] ?yrest.
+    [[?y] ?yrest] lconcat ?ys.
+) => (
+    ?xs [map ?f] ?ys.
+).
+
+( ?s [?f ?x] ?y.) => ( [?x] [fold ?s ?f] [?y].).
+(
+    ?f a nonvar.
+    ?xs head ?x; tail ?rest.
+    ?s [?f ?x] ?s1.
+    ?rest [fold ?s1 ?f] ?res.
+) => (
+    ?xs [fold ?s ?f] ?res.
+).
+
+
+0 fib 0. 1 fib 1. fib <- [[fanout [- 1] [- 2]] >> [map [k cache fib]] >> sum].
+
+
+
+(
+    [?state [
+        [fun [success ?resValue ?resState] -> (
+            ?resValue ?f ?step1. 
+            [?resState ?cont] ?step1 ?res1.
+        ) return ?res1] 
+        or [fun ?res -> ( ?res ?cont ?res1.) return ?res1]
+    ]
+    ] ?p1 ?final.
+) => (
+    [?state ?cont] [?p1 >>= ?f] ?final.
+).
+
+
+(
+    ?input [length >> <] ?position.
+    [error "EOF"  [?input ?position]] ?k ?o.
+) => (
+    [[?input ?position] ?k] [pnum ?v] ?o.
+    [[?input ?position] ?k] pnum ?o.
+).
+(
+    ?input [length >> >] ?position.
+    [error [Partial parse reach position ?position on ?input] [?input ?position]] ?k ?o.
+) => (
+    [[?input ?position] ?k] pEOF ?o.
+).
+
+(
+    ?input [?position] ?v.
+    ?v a number.
+    ?position [+ 1] ?newPosition.
+    [success ?v [?input ?newPosition]] ?k ?o.
+) => (
+    [[?input ?position] ?k] [pnum ?v] ?o.
+    [[?input ?position] ?k] pnum ?o.
+).
+
+(
+    ?input [?position] ?v.
+    ?v a atom.
+    ?position [+ 1] ?newPosition.
+    [success ?v [?input ?newPosition]] ?k ?o.
+) => (
+    [[?input ?position] ?k] [patom ?v] ?o.
+    [[?input ?position] ?k] patom ?o.
+).
+
+
+[?p1 then ?p2] <- [?p1 >>= [fun ?x -> ( ?r2 = [?p2 >>= [fun ?op -> ( [?x ?op] pure ?xop.) return ?xop ] ].) return ?r2]].
+
+[?p1 map ?f] <- [?p1 >>= [fun ?x -> ( ?x [?f >> pure] ?res.) return ?res]].
+
+[psequence [?p1]] <-- ?p1.
+[psequence [?p1 ?p2]] <-- [?p1 then ?p2].
+
+(
+    ?ps head ?p1; tail ?rest1. ?rest1 head ?p2; tail ?rest2.
+    ?i [[[?p1 then ?p2] then [psequence ?rest2]] map [fun [[?a ?b] ?c] -> (?r = [?a ?b ?c].) return ?r]] ?o.
+) => (
+    ?i [psequence ?ps] ?o.
+).
+(?x [?op ?y] ?z.) => ([?x ?op ?y] eval ?z.).
+
+[pBRRTree ?x ?y ?z ?merge] <- [[[psequence [?x ?y ?z]] map ?merge] or ?x].
+[pBRRTree ?x ?y ?z] <- [[psequence [?x ?y ?z]]  or ?x].
+[?x -> ?y -> ?z] <- [pBRRTree ?x ?y ?z [fun [?a ?op ?b] -> (1 = 1.) return (?op left ?a; right ?b.)] ].
+
+pexpr <- [pmul -> [patom +] -> pexpr ].
+pmul <- [pdiv -> [patom *] -> pmul].
+pdiv <- [pnum -> [patom /] -> pdiv].
+
+
+( [[?i 0] id] [?p then pEOF] ?o. ) => ( ?i [runParser ?p] ?o.).
+( [[?i 0] id] ?p ?o. ) => ( ?i [runParserPartial ?p] ?o.).
+
+
+[apply5Times ?f] <- [?f >> ?f >> ?f >> ?f >> ?f].
+
+
+system query [[?status ?res ?d ?fact] (
+    [3 + 2 * 5 / 2 + 4 * 2] [runParser pexpr ] [?status ?res ?s].
+    
+    3 [apply5Times [+ 2]] ?d.
+
+    [3 4 5] [fold 0 +] ?fact.
+)].
