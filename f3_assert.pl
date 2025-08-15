@@ -18,6 +18,7 @@
 :- use_module(builtins/regex).
 % :- use_module(builtins/'list-parser').
 :- use_module(builtins/lambda).
+:- use_module(builtins/ziplib).
 
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
@@ -45,9 +46,13 @@ p(X, a, integer) :- integer(X).
 p(X, a, string):- string(X).
 p(X, a, list) :- is_list(X).
 p(X, a, nonvar) :- nonvar(X).
+p(graph(G), a, graph).
+p([Low, High], rand, R) :- random(Low, High, R).
+
 p([H|_], head, H).
 p([_|T], tail, T).
 p(system, sleep, T) :- sleep(T).
+% p(system, trace, []) :- trace.
 
 p(ThreadId, startThread, graph(G)) :-
  list_to_conjunction(G, C), thread_create(C, ThreadId, []).
@@ -67,14 +72,32 @@ p(TimeStamp, [timeStampToString, Format], FormattedString) :-
 
 
 p(A, =, B) :- A = B.
-p(A, neq, B) :- p(system, log, ["QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ", test, A, not, equal, to, B]), A \= B.
+p(A, neq, B) :-  A \= B.
 p(A, >, B) :- A > B.
 p(A, <, B) :- A < B.
 p(A, >=, B) :- A >= B.
 p(A, =<, B) :- A =< B.
 p(Ns, sum, Sum) :- sum_list(Ns, Sum).
+
+% Find minimum element by projection predicate
+p(XS, [minBy, Pred], Smallest) :-
+    is_list(XS),
+    XS = [H|_],
+    minby_helper(XS, Pred, H, Smallest).
+
+% Helper predicate for minby
+minby_helper([], _, Acc, Acc).
+minby_helper([X|XS], Pred, Acc, Smallest) :-
+    p(X, Pred, XProj),
+    p(Acc, Pred, AccProj),
+    (XProj < AccProj ->
+        minby_helper(XS, Pred, X, Smallest)
+    ;   minby_helper(XS, Pred, Acc, Smallest)
+    ).
+
 p(system, log, X) :- node_string(X, S),!, format(user_error, "~w~n", [S]).
 p(system, log, X) :- format(user_error, "~q~n", [X]), !.
+
 p(X, toString, S) :- node_string(X, S).
 p(S, parseInteger, I) :- 
     atom_string(S, Str),
@@ -97,10 +120,9 @@ p(graph(G1), or, graph(G2)) :-
 p(XS, sconcat, Res) :- atomics_to_string(XS, Res) .
 p(S, [splitString, Separator], Res) :- 
    atom_string(S, SStr),
-   format(user_error, "ZZZZZZZZZZZZZZZZZZZZ Splitting string: ~q with separator: ~q~n", [SStr, Separator]),
-    split_string(SStr, Separator, "", Res),
-    
-   format(user_error, "ZZZZZZZZZZZZZZZZZZZZ split success: ~q~n", [Res])
+   % format(user_error, "ZZZZZZZZZZZZZZZZZZZZ Splitting string: ~q with separator: ~q~n", [SStr, Separator]),
+    split_string(SStr, Separator, "", Res)    
+   % format(user_error, "ZZZZZZZZZZZZZZZZZZZZ split success: ~q~n", [Res])
     .  
 
 p(X, [reverse, Pred], Y) :- 
@@ -112,6 +134,8 @@ p(X, [reverse, Pred], Y) :-
    
 p([Xs, Ys], lconcat, Res) :- 
    append(Xs, Ys, Res).
+p([graph(G1), graph(G2)], gconcat, graph(Res)) :-
+   append(G1, G2, Res).
 p(Xs, [Index], Element) :- 
     number(Index),
     !,
@@ -443,6 +467,7 @@ main([Arg1, Arg2]) :-
    % listing(p),
    % format(user_error, "~n Results 1 :~n", []),
    (Arg1 = run ->
+      % trace(p/3),
    forall((p(system, query, [Path, graph(G)])), (
           list_to_conjunction(G, Conjunction),
     % Collect first argument from each triple that matches the pattern

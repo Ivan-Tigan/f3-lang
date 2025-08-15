@@ -1,0 +1,55 @@
+// Rule to generate HTML form for selecting main calendar
+(
+    ?R [f3AuthSession >> match] ( sub = ?UserId. ).
+    ?Txn lmdbStartR "./db".
+    (
+        ?Txn lmdbQuery { ?UserId mainCalendar ?DefaultCalendarId. }.
+        ?DefaultValue = ?DefaultCalendarId.
+    ) or (
+        ?DefaultValue = "".
+    ).
+    [?Option (
+        ?Txn lmdbQuery { ?UserId calendar ?CalendarId. ?CalendarId name ?CalendarName. }.
+        (
+            ?CalendarId = ?DefaultValue.
+            ["<option value='" ?CalendarId "' selected>" ?CalendarName "</option>"] sconcat ?Option.
+        ) or (
+            ["<option value='" ?CalendarId "'>" ?CalendarName "</option>"] sconcat ?Option.
+        ).
+    )] collect ?Options.
+    ?Txn lmdbEnd [].
+    system cut [].
+    ?Options sconcat ?OptionsHTML.
+    ["<form action='/set-main-calendar' method='post'>
+    <fieldset role='group'>
+    <select id='calendarId' name='calendarId' required>
+    " ?OptionsHTML "
+    </select>
+    <input type='submit' value='Set Main Calendar'>
+    </fieldset>
+    </form>"] sconcat ?HTML.
+) => (?R setMainCalendarFormHTML ?HTML.).
+
+?R setMainCalendarFormHTML "<form action='/set-main-calendar' method='post'>
+<fieldset role='group'>
+<select id='calendarId' name='calendarId' required>
+<option value=''>No calendars available</option>
+</select>
+<input type='submit' value='Set Main Calendar'>
+</fieldset>
+</form>".
+
+// Rule to handle POST request for setting main calendar
+(
+    ?R match ( 
+        ?RID a post; 
+        path "/set-main-calendar"; 
+        body ( calendarId = ?CalendarId. ); 
+        headers ( referer = ?referer. ).
+    );
+    [f3AuthSession >> match] ( sub = ?UserId. ).
+    ?txn lmdbStartRW "./db"; 
+    lmdbDelete {?UserId mainCalendar ?OldCalendarId.}; 
+    lmdbInsert { ?UserId mainCalendar ?CalendarId. }; 
+    lmdbEnd [].
+) => ( ?R response (?RID status 302; headers ( "Location" = ?referer. ). ). ).

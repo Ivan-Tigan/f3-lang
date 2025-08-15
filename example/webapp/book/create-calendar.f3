@@ -1,0 +1,41 @@
+// Rule to generate calendar selection table HTML
+(
+     ?r [f3AuthSession >> match] ( sub = ?UserId. ).
+    ?Txn lmdbStartR "./db". 
+    [?Option ( 
+        ?Txn lmdbQuery { ?UserId calendar ?CalendarId. ?CalendarId name ?CalendarName.}. 
+        ["<tr><td>" ?CalendarName "</td><td><a href='/calendar/" ?CalendarId "'>Edit</a></td></tr>"] sconcat ?Option. )
+    ] collect ?Options.
+    ?Txn lmdbEnd [].
+    system cut [].
+    ?Options sconcat ?OptionsHTML.
+    ["<table>
+    <thead>
+        <tr>
+            <th>Calendar Name</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+    " ?OptionsHTML "
+    </tbody>
+    </table>"] sconcat ?SelectHTML.
+) => (?r calendarSelect ?SelectHTML.).
+?r calendarSelect "<table><thead><tr><th>Calendar Name</th><th>Action</th></tr></thead><tbody></tbody></table>".
+
+// Calendar creation form HTML
+?R calendarForm "<form action='/create-calendar' method='post'>
+<fieldset role='group'>
+    <input type='text' placeholder='Calendar Name' name='calendarname' required>
+    <input type='submit' value='Create Calendar'>
+ </fieldset>   
+    </form>".
+
+// Rule to handle POST request for creating calendar
+( 
+   ?r match ( ?RID a post; path "/create-calendar"; body ( calendarname = ?CalendarName. ); headers ( referer = ?referer.).);
+    [f3AuthSession >> match] ( sub = ?UserId. ). 
+   ?RID sha256 ?RIDHash.
+   ["calendar_" ?RIDHash] sconcat ?CalendarId.
+   ?txn lmdbStartRW "./db"; lmdbInsert { ?UserId calendar ?CalendarId. ?CalendarId a Calendar; name ?CalendarName. }; lmdbEnd [].
+) => ( ?r response (?RID status 302; headers ( "Location" = ?referer. ). ).  ).

@@ -1,0 +1,34 @@
+// Rule to get tenant subdomain string for current user
+( 
+    ?r [f3AuthSession >> match ] ( sub = ?UserId. ). 
+    ?txn lmdbStartR "./db"; lmdbQuery { ?UserId a User; tenantSubdomain ?s. }; lmdbEnd []. 
+    system cut [].
+) 
+=> ( ?r tenantSubdomainString ?s.).
+?r tenantSubdomainString "".
+
+// Rule to generate tenant subdomain form HTML
+(
+   ?r tenantSubdomainString ?S. 
+   system log ["tenantSubdomainString" ?S "tenantBaseUrl" ?AppURL].
+   ?r tenantBaseUrl ?AppURL.
+   system log ["tenantSubdomainString 2" ?S "tenantBaseUrl" ?AppURL].
+    system cut [].
+   // 2@html
+   ["<form action='/set-tenant-subdomain' method='post'>
+   <fieldset role='group'>
+   <input type='text' name='subdomain' required value='" ?S "'>
+   <input type='submit' value='Set Subdomain'>
+   </fieldset>
+   <small>Your app is available at <a href='" ?AppURL "'> " ?AppURL "</a></small>
+   </form>
+   " ] sconcat ?HTML.
+) => ( ?r tenantSubdomainForm ?HTML. ).
+?R tenantSubdomainForm "".
+
+// Rule to handle POST request for setting tenant subdomain
+( 
+   ?r match ( ?RID a post; path "/set-tenant-subdomain"; body ( subdomain = ?Subdomain. ); headers ( referer = ?referer.).);
+    [f3AuthSession >> match] ( sub = ?UserId. ). 
+   ?txn lmdbStartRW "./db"; lmdbDelete {?UserId tenantSubdomain ?OldSubdomain.}; lmdbInsert { ?UserId tenantSubdomain ?Subdomain. }; lmdbEnd [].
+) => ( ?r response (?RID status 302; headers ( "Location" = ?referer. ). ).  ).

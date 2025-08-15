@@ -4,7 +4,8 @@
 // HTML form template for file uploads
 (
     ?R match (?RID a get; path "/".).
-    
+    "./uploads" listDirectoryEntries ?Files.
+    system log ["Files in uploads directory: " ?Files].
     ["<html>
     <head>
         <title>File Upload Example</title>
@@ -51,30 +52,14 @@
     ).
 ).
 
-// Handle file upload POST request
 (
-    ?R match (
-        ?RID a post; 
-        path "/upload"; 
-        body ?FormData.
-    ).
+    ?R match ( ?RID a post; path "/upload"; body ?FormData.).
     
-    // Log the received form data for debugging
     system log [ "Form data received:" ?FormData].
     
-    // Extract file data from multipart form
-    ?FormData match (
-        file = ?FileData.
-        description = ?Description.
-    ).
+    ?FormData match ( file = ?FileData.  description = ?Description.).
+    ?FileData match ( filename = ?OriginalFilename.  content = ?FileContent.).
     
-    // Extract file information from the multipart data structure
-    ?FileData match (
-        filename = ?OriginalFilename.
-        content = ?FileContent.
-    ).
-    
-    // Generate unique filename with timestamp but keep original extension
     system now ?Timestamp.
     ?Timestamp toString ?TimestampStr.
     ["upload_" ?TimestampStr "_" ?OriginalFilename] sconcat ?Filename.

@@ -36,7 +36,7 @@ user:p(PlainText, [encrypt, Secret], CipherText) :-
 user:p(CipherText, [decrypt, Secret], PlainText) :-
     % Use ChaCha20-Poly1305 authenticated encryption
     Algorithm = 'chacha20-poly1305',
-    format(user_error, 'YYYYYYYYYYYYYY decrypt: ~w ~n', [Secret]),
+    % format(user_error, 'YYYYYYYYYYYYYY decrypt: ~w ~n', [Secret]),
     % Derive key from secret (same as encryption)
     crypto_data_hash(Secret, KeyHash, [algorithm(sha256), encoding(utf8)]),
     hex_bytes(KeyHash, Key),

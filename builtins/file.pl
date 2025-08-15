@@ -62,6 +62,16 @@ read_all_bytes(Stream, Acc, Bytes) :-
     ;   read_all_bytes(Stream, [Byte|Acc], Bytes)
     ).
 
+% List directory entries
+user:p(Dir, listDirectoryEntries, Entries) :-
+    atom_string(Dir, DirString),
+    directory_files(DirString, EntriesA), maplist(atom_string, EntriesA, Entries).
+
+% Delete file
+user:p(RelativeFilePath, deleteFile, []) :-
+    atom_string(RelativeFilePath, FilePathString),
+    delete_file(FilePathString).
+
 % Tests
 :- begin_tests(file_builtin).
 
@@ -145,6 +155,53 @@ test(write_file_with_directory) :-
     delete_file(TestFile),
     delete_directory('test_dir/subdir'),
     delete_directory('test_dir').
+
+test(list_directory_entries) :-
+    % Create test directory structure
+    make_directory('test_list_dir'),
+    TestFile1 = 'test_list_dir/file1.txt',
+    TestFile2 = 'test_list_dir/file2.txt',
+    p(TestFile1, writeTextToFile, 'Content 1'),
+    p(TestFile2, writeTextToFile, 'Content 2'),
+    make_directory('test_list_dir/subdir'),
+    
+    % Test listing directory entries
+    p('test_list_dir', listDirectoryEntries, Entries),
+    
+    % Check that we get the expected entries (order may vary)
+    member('.', Entries),
+    member('..', Entries),
+    member('file1.txt', Entries),
+    member('file2.txt', Entries),
+    member('subdir', Entries),
+    
+    % Clean up
+    delete_file(TestFile1),
+    delete_file(TestFile2),
+    delete_directory('test_list_dir/subdir'),
+    delete_directory('test_list_dir').
+
+test(delete_file_builtin) :-
+    % Create a test file
+    TestFile = 'test_delete.txt',
+    p(TestFile, writeTextToFile, 'This file will be deleted'),
+    
+    % Verify file exists
+    exists_file(TestFile),
+    
+    % Test deleting the file
+    p(TestFile, deleteFile, []),
+    
+    % Verify file no longer exists
+    \+ exists_file(TestFile).
+
+test(delete_nonexistent_file) :-
+    % Test error handling when trying to delete nonexistent file
+    catch(
+        p('nonexistent_delete.txt', deleteFile, []),
+        Error,
+        Error = error(existence_error(source_sink, 'nonexistent_delete.txt'), _)
+    ).
 
 :- end_tests(file_builtin).
 :- set_test_options([silent(false)]).

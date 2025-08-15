@@ -1,0 +1,13 @@
+(
+    ?R f3AuthWidget ?F3AuthWidget; subdomain ?Subdomain.  
+    (
+        ?R tenantSubdomainString ?Subdomain.
+        ?Links = "<li><a href='/dashboard'>Dashboard</a></li>".
+    ) or (
+        (
+            ?R f3AuthSession ?F3AuthSession. ?Links = "<li><a href='/bookings'>My Bookings</a></li>".) or (
+            ?Links = "".
+        ).
+    ).
+    ["<nav> <ul><li>bbookk.io</li></ul> <ul> <li>" ?F3AuthWidget "</li> </ul></nav>"] sconcat ?NavHTML. ) 
+=> (?R navbar ?NavHTML.).

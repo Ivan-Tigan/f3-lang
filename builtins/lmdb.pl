@@ -17,14 +17,19 @@
 
 % Txn lmdbStartR "path" - Start a read-only transaction with custom path
 user:p(Txn, lmdbStartR, Path) :-
-    lmdbstart(Txn, read, Path).
+    lmdbstart(Txn, read, Path)
+    % format(user_error, 'TTTTTT Starting read-only transaction: ~q ~n', [Txn])
+    .
 
 % Txn lmdbStartRW "path" - Start a read-write transaction with custom path
 user:p(Txn, lmdbStartRW, Path) :-
-    lmdbstart(Txn, write, Path).
+    lmdbstart(Txn, write, Path)
+    % format(user_error, 'TTTTTT Starting read-write transaction: ~q ~n', [Txn])
+    .
 
 % Txn lmdbEnd [] - End a transaction (commit/abort based on transaction type)
 user:p(Txn, lmdbEnd, []) :-
+    % format(user_error, 'TTTTTT End transaction: ~q ~n', [Txn]),
     lmdbend(Txn).
 
 % Triple insertion and querying predicates
@@ -37,7 +42,12 @@ user:p(Txn, lmdbInsert, p(S, P, O)) :-
 % Txn lmdbQuery p(S, P, O) - Query triples from the database  
 % The F3 syntax "Txn lmdbQuery { S P O. }" gets parsed into this
 user:p(Txn, lmdbQuery, p(S, P, O)) :-
+    % format(user_error, 'TTTTTT Querying: ~q ~q ~n', [Txn, p(S, P, O)]),
     lmdbquery(Txn, S, P, O).
+    % catch(lmdbquery(Txn, S, P, O), Error, 
+    % (format(user_error, 'TTTTTT Query error: ~w ~n', [Error]), fail)),
+    % format(user_error, 'TTTTTT Query result: ~q ~n', [p(S, P, O)])
+    % .
 
 % Txn lmdbDelete p(S, P, O) - Delete a triple from the database
 % The F3 syntax "Txn lmdbDelete { S P O. }" gets parsed into this

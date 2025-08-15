@@ -1,23 +1,46 @@
 (
-    ?R match ( ?RID a get; path ?Path. )
-    ; [f3AuthSession >> match] ( sub = ?UserId. ).
-    
-    
-    ?Path [splitString "/"] ["" "calendar" ?CalendarId].
-    ?Txn lmdbStartR "./db"
-    ; lmdbQuery { ?UserId calendar ?CalendarId. ?CalendarId name ?CalendarName. }
+    ?R match ( ?RID a get; path ?Path. ).
+   
+   system log xxxxxxxxxxxxxxxx1.
+    ?Txn lmdbStartR "./db".
+   system log xxxxxxxxxxxxxxx2.
+    (
+        ?Path [splitString "/"] ["" "calendar" ?CalendarId].
+   system log xxxxxxxxxxxxxxx3.
+        ?R [f3AuthSession >> match] ( sub = ?Admin. ).
+   system log xxxxxxxxxxxxx4.
+        ?Txn lmdbQuery { ?Admin calendar ?CalendarId. }.
+   system log xxxxxxxx5.
+        ?IsAdmin = true.
+    ) or (
+        ?Path = "/".
+   system log x6.
+        ?R subdomain ?Tenant.
+   system log x7.
+        system log ["TTTTTTTTTTTTTTT Tenant subdomain: " ?Tenant].
+        ?Txn lmdbQuery { ?TenantUserId tenantSubdomain ?Tenant; mainCalendar ?CalendarId. }.
+        system log ["TTTTTTTTTTTTTTT Tenant calendar: " ?CalendarId].
+        ?IsAdmin = false.
+    ).
+    ?Txn lmdbQuery { ?CalendarId name ?CalendarName. }
     ; lmdbEnd [].
+    system sleep 1.
     system cut [].
+        system log ["TTTTTTTTTTTTTTT 1: " ?CalendarId].
     system [now >> weekStart] ?WeekStart.
     ?WeekStart [timeStampToString "%a, %d %b %Y %T GMT"] ?WeekStartStr.
 
+        system log ["TTTTTTTTTTTTTTT 2: " ?CalendarId].
     [?WeekStart 7] addDays ?WeekEnd.
     ?WeekEnd [timeStampToString "%a, %d %b %Y %T GMT"] ?WeekEndStr.
+        system log ["TTTTTTTTTTTTTTT 3: " ?CalendarId].
     time secondsPerDay ?SecondsPerDay; secondsPerWeek ?SecondsPerWeek.
     clpfd constraint [
         ?WeekStart + ?DayIteration * ?SecondsPerDay  = ?DayIterationTimeStamp
         & ?DayIterationTimeStamp in ?WeekStart ?WeekEnd
     ].
+        system log ["TTTTTTTTTTTTTTT 4: " ?CalendarId].
+        //todo failed
     ?Txn2 lmdbStartR "./db".
     [?DayColumn (
         clpfd label [?DayIterationTimeStamp].
@@ -54,6 +77,15 @@
                 }.
             )] [collect >> length] ?Bookings.
 
+            (
+                ?IsAdmin = true.
+                ["<a href='/event/" ?EventId "/" ?Iteration "/book'>Book</a>
+                    <a href='/event/" ?EventId "/" ?Iteration "/bookings'>Bookings</a>
+                    <a href='/event/" ?EventId "/" ?Iteration "/edit'>Edit</a>"] sconcat ?ActionsHTML.
+            ) or (
+                ["<a href='/event/" ?EventId "/" ?Iteration "/book'>Book</a>"] sconcat ?ActionsHTML.
+            ).
+
             ["<div style='display: flex; justify-content: space-between; flex-direction:column; '>
             <div style='display: flex; justify-content: space-between;'>
                 <div>" ?IterationTimeStampStr " - " ?EventEnd "</div> 
@@ -62,9 +94,7 @@
             <div style='display: flex; justify-content: space-between;'>
                 <div>" ?EventName "</div>
                 <div>
-                    <a href='/event/" ?EventId "/" ?Iteration "/book'>Book</a>
-                    <a href='/event/" ?EventId "/" ?Iteration "/bookings'>Bookings</a>
-                    <a href='/event/" ?EventId "/" ?Iteration "/edit'>Edit</a>
+                    " ?ActionsHTML "
                 </div>
             </div>
             </div>
@@ -74,6 +104,7 @@
         ["<div><div>" ?DayColumnHeaderTimestamp "</div><div>" ?EventRows "</div></div>"] sconcat ?DayColumn.
     )] [collect >> sconcat] ?DayColumns.
     ?Txn2 lmdbEnd [].
+        system log ["TTTTTTTTTTTTTTT 10: " ?CalendarId].
     ["
     <style>
         .column-stack { display: flex; flex-direction: column; }

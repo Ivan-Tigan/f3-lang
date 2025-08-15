@@ -27,10 +27,25 @@ json_to_graph(json(Fields), graph(GraphFields)) :-
 json_field_to_graph(Name=json(SubFields), p(Name,=,graph(GraphSubFields))) :-
     !, % Cut for when we have nested JSON objects
     maplist(json_field_to_graph, SubFields, GraphSubFields).
+json_field_to_graph(Name=Array, p(Name,=,ArrayResult)) :-
+    is_list(Array), !, % Cut for when we have JSON arrays
+    maplist(json_array_element_to_graph, Array, ArrayResult).
 json_field_to_graph(Name='@'(true), p(Name,=,true)) :- !.
 json_field_to_graph(Name='@'(false), p(Name,=,false)) :- !.
 json_field_to_graph(Name='@'(null), p(Name,=,null)) :- !.
 json_field_to_graph(Name=Value, p(Name,=,Value)).
+
+% Helper to convert array elements
+json_array_element_to_graph(json(SubFields), graph(GraphSubFields)) :-
+    !, % Cut for nested objects in arrays
+    maplist(json_field_to_graph, SubFields, GraphSubFields).
+json_array_element_to_graph('@'(true), true) :- !.
+json_array_element_to_graph('@'(false), false) :- !.
+json_array_element_to_graph('@'(null), null) :- !.
+json_array_element_to_graph(ArrayElement, ArrayElement) :-
+    is_list(ArrayElement), !, % Nested array
+    maplist(json_array_element_to_graph, ArrayElement, ArrayElement).
+json_array_element_to_graph(Value, Value).
 
 % Helper: Convert F3 graph format to SWI-Prolog JSON term
 graph_to_json(graph(GraphFields), json(Fields)) :-
@@ -39,10 +54,25 @@ graph_to_json(graph(GraphFields), json(Fields)) :-
 graph_field_to_json(p(Name,=,graph(GraphSubFields)), Name=json(SubFields)) :-
     !, % Cut for nested graph objects
     maplist(graph_field_to_json, GraphSubFields, SubFields).
+graph_field_to_json(p(Name,=,Array), Name=ArrayResult) :-
+    is_list(Array), !, % Cut for arrays
+    maplist(graph_array_element_to_json, Array, ArrayResult).
 graph_field_to_json(p(Name,=,true), Name='@'(true)) :- !.
 graph_field_to_json(p(Name,=,false), Name='@'(false)) :- !.
 graph_field_to_json(p(Name,=,null), Name='@'(null)) :- !.
 graph_field_to_json(p(Name,=,Value), Name=Value).
+
+% Helper to convert array elements back to JSON
+graph_array_element_to_json(graph(GraphSubFields), json(SubFields)) :-
+    !, % Cut for nested objects in arrays
+    maplist(graph_field_to_json, GraphSubFields, SubFields).
+graph_array_element_to_json(true, '@'(true)) :- !.
+graph_array_element_to_json(false, '@'(false)) :- !.
+graph_array_element_to_json(null, '@'(null)) :- !.
+graph_array_element_to_json(ArrayElement, ArrayResult) :-
+    is_list(ArrayElement), !, % Nested array
+    maplist(graph_array_element_to_json, ArrayElement, ArrayResult).
+graph_array_element_to_json(Value, Value).
 
 % Tests
 :- begin_tests(json_builtin).
@@ -95,6 +125,29 @@ test(bidirectional_round_trip) :-
             p(name,=,"Test User"),
             p(preferences,=,graph([p(theme,=,"dark")]))
         ]))
+    ]),
+    p(OriginalGraph, jsonToString, JsonString),
+    p(JsonString, parseJson, ParsedGraph),
+    OriginalGraph = ParsedGraph.
+
+test(parse_json_with_arrays) :-
+    % Test JSON with arrays
+    JsonString = '{"items": ["apple", "banana"], "numbers": [1, 2, 3], "mixed": [{"name": "test"}, 42, true]}',
+    p(JsonString, parseJson, Graph),
+    Graph = graph([
+        p(items,=,["apple", "banana"]),
+        p(numbers,=,[1, 2, 3]),
+        p(mixed,=,[graph([p(name,=,"test")]), 42, true])
+    ]).
+
+test(array_round_trip) :-
+    % Test array bidirectional functionality
+    OriginalGraph = graph([
+        p(tags,=,["red", "blue", "green"]),
+        p(users,=,[
+            graph([p(name,=,"Alice"), p(age,=,25)]),
+            graph([p(name,=,"Bob"), p(age,=,30)])
+        ])
     ]),
     p(OriginalGraph, jsonToString, JsonString),
     p(JsonString, parseJson, ParsedGraph),

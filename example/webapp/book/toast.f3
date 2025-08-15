@@ -1,0 +1,44 @@
+// Toast notification functionality
+(
+    ?R match (?RID cookies (toast = ?ToastCookie.).).
+    ?ToastCookie [splitString ":"] [?Type ?Message].
+    system cut [].
+    
+    (
+        ?Type = "error".
+        ["<script>
+            window.addEventListener('load', function() {
+                // Clear the toast cookie immediately
+                document.cookie = 'toast=; Path=/; Max-Age=0';
+                
+                Toastify({
+                    text: \"" ?Message "\",
+                    duration: 5000,
+                    close: true,
+                    gravity: \"top\",
+                    position: \"center\",
+                    backgroundColor: \"#f44336\",
+                }).showToast();
+            });
+        </script>"] sconcat ?ToastHTML.
+    ) or (
+        ?Type = "success".
+        ["<script>
+            window.addEventListener('load', function() {
+                // Clear the toast cookie immediately
+                document.cookie = 'toast=; Path=/; Max-Age=0';
+                
+                Toastify({
+                    text: \"" ?Message "\",
+                    duration: 5000,
+                    close: true,
+                    gravity: \"top\",
+                    position: \"center\",
+                    backgroundColor: \"#4caf50\",
+                }).showToast();
+            });
+        </script>"] sconcat ?ToastHTML.
+    ).
+) => (?R toastHTML ?ToastHTML.).
+
+?R toastHTML "".

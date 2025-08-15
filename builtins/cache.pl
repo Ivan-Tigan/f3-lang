@@ -40,5 +40,6 @@ user:p(A, [Key, cache, P], B) :-
     access_cache(A, [Key, cache, P], B),  !.
 user:p(A, [Key, cache, P], B) :-
     user:p(A, P, B), !,
+    format(user_error, "Cache miss for ~w with key ~w~n", [P, Key]),
     write_cache(A, [Key, cache, P], B),
     !.

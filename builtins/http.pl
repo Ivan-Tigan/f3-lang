@@ -63,6 +63,11 @@ json_field_to_graph(Name=Value, p(Name,=,ValueString)) :-
     atom_string(Value, ValueString).
 json_field_to_graph(Name=Value, p(Name,=,Value)).
 
+% Helper predicate to check if all codes are printable ASCII
+all_printable_ascii([]).
+all_printable_ascii([Code|Rest]) :-
+    (Code >= 32, Code =< 126 ; Code =:= 9 ; Code =:= 10 ; Code =:= 13), % printable ASCII + tab/newline/CR
+    all_printable_ascii(Rest).
 
 % Main predicate to handle HTTP requests with caching
 user:p(Request, fetch, Response) :-
@@ -104,20 +109,49 @@ user:p(Request, fetch, Response) :-
                 http_post(URL, '', ResponseData, Options)
             )
         ; Method = get ->
-            append(HeaderOptions, [status_code(_)], Options),
+            append(HeaderOptions, [status_code(StatusCode), to(atom)], Options),
             http_get(URL, ResponseData, Options)
         ),
         Error,
         (format(user_error, 'HTTP Error: ~w~n', [Error]), 
-         ResponseData = json([error=Error]))
+         ResponseData = error(Error),
+         StatusCode = 0)
     ),
     
-    % Convert response to graph format
-    (is_dict(ResponseData) ->
+    % Convert response to graph format based on content type and status
+    (var(StatusCode) -> ActualStatusCode = 200 ; ActualStatusCode = StatusCode),
+    
+    (ActualStatusCode >= 400 ->
+        % Error response - don't try to parse as JSON
+        ResponseBody = graph([p(text, =, ResponseData), p(status_code, =, ActualStatusCode)])
+    ; ResponseData = error(Error) ->
+        % Error from catch block
+        ResponseBody = graph([p(error, =, Error)])
+    ; is_dict(ResponseData) ->
         json_to_graph(ResponseData, ResponseBody)
     ; ResponseData = json(_) ->
         json_to_graph(ResponseData, ResponseBody)
-    ;   ResponseBody = graph([p(text, =, ResponseData)])
+    ; atom(ResponseData) ->
+        % Convert atom to codes (bytes) and check if it's likely text or binary
+        atom_codes(ResponseData, ResponseCodes),
+        % Check first 100 bytes to determine if it's text or binary
+        (ResponseCodes = [] ->
+            ResponseBody = graph([p(text, =, ResponseData)])
+        ; length(ResponseCodes, Len), Len =< 100 ->
+            SampleCodes = ResponseCodes
+        ; append(SampleCodes, _, ResponseCodes), length(SampleCodes, 100)
+        ),
+        (all_printable_ascii(SampleCodes) ->
+            % Try to parse as JSON first, fall back to text
+            (catch(atom_json_dict(ResponseData, JSONDict, []), _, fail) ->
+                json_to_graph(JSONDict, ResponseBody)
+            ;   ResponseBody = graph([p(text, =, ResponseData)])
+            )
+        ;   % Binary data - return as bytes array
+            ResponseBody = graph([p(bytes, =, ResponseCodes)])
+        )
+    ;   % Large response or binary data - treat as text
+        ResponseBody = graph([p(text, =, ResponseData)])
     ),
     
     % Construct response

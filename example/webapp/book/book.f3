@@ -1,4 +1,4 @@
-system include "./f3auth.f3", "./time.f3", "./events-table.f3".
+system include "./f3auth.f3", "./time.f3", "./events-table.f3", "./set-main-calendar.f3", "./set-tenant-subdomain.f3", "./create-calendar.f3", "./toast.f3", "./navbar.f3".
 f3Auth encryptionSecretKey "Some secret key";
     clientId "0xdrjgnfvjdpn7wfgs1z2";
     clientSecret "CDlhWVPjoX0K6yZe9BDuajrRgEsbZ3DI";
@@ -22,7 +22,7 @@ f3Auth encryptionSecretKey "Some secret key";
 ( ?R match (?RID headers (host = ?Host.).). ?Host [[splitString "."] >> [0]] ?RSub. ?RSub neq "bbookk".) 
 => ( ?R subdomain ?RSub.).
 
-(?XS sconcat ?S. ["<html data-theme='light'> <head> <title>F3 Auth Demo</title> 
+(?XS sconcat ?S. ?R toastHTML ?ToastHTML; navbar ?Nav. ["<html data-theme='light'> <head> <title>F3 Auth Demo</title> 
 "
 // <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css'>
 
@@ -30,6 +30,8 @@ f3Auth encryptionSecretKey "Some secret key";
 // <link rel='stylesheet' href='http://127.0.0.1:5500/picogram.css'>
 "
 <link rel=\"stylesheet\" href=\"https://npmcdn.com/select-combobox/dist/combobox.css\">
+<link rel=\"stylesheet\" type=\"text/css\" href=\"https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css\">
+<script type=\"text/javascript\" src=\"https://cdn.jsdelivr.net/npm/toastify-js\"></script>
 
 
 <link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic'>
@@ -55,11 +57,9 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
 </style>
 
 
- </head> <body><main class='container'>" ?S "</main></body></html>" ] sconcat ?H. ) 
-=> (?XS buildHTML ?H.).
+ </head> <body><main class='container'>" ?Nav ?S "</main>" ?ToastHTML "</body></html>" ] sconcat ?H. ) 
+=> (?XS [buildHTML ?R] ?H.).
 
-(?R f3AuthWidget ?F3AuthWidget. ["<nav> <ul><li>bbookk.io</li></ul> <ul> <li>" ?F3AuthWidget "</li> </ul></nav>"] sconcat ?NavHTML. ) 
-=> (?R navbar ?NavHTML.).
 
 
 (
@@ -67,13 +67,6 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
    ?txn lmdbStartRW "./db"; lmdbInsert { ?UserId a User; name ?UserName; email ?UserEmail.}; lmdbEnd [].
 ) => ( ?R initTenant ?F3AS.).
 
-( 
-    ?r [f3AuthSession >> match ] ( sub = ?UserId. ). 
-    ?txn lmdbStartR "./db"; lmdbQuery { ?UserId a User; tenantSubdomain ?s. }; lmdbEnd []. 
-    system cut [].
-) 
-=> ( ?r tenantSubdomainString ?s.).
-?r tenantSubdomainString "".
 
 (?r match (?RID port 80; protocol "http".). system cut [].) 
 => (?r portString "".).
@@ -82,84 +75,38 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
 (?r match (?RID port ?Port.). [":" ?Port] sconcat ?PortString.) 
 => (?r portString ?PortString.).
 
-(
-    f3Auth appDomain ?AppDomain.
-   ?r match ( ?RID protocol ?Protocol. ); [f3AuthSession >> match ] ( sub = ?UserId. ); tenantSubdomainString ?S; portString ?PortString.
-    system cut [].
-    [?Protocol "://" ?S "." ?AppDomain ?PortString] sconcat ?AppURL.
-   // 2@html
-   ["<form action='/set-tenant-subdomain' method='post'>
-   <fieldset role='group'>
-   <input type='text' name='subdomain' required value='" ?S "'>
-   <input type='submit' value='Set Subdomain'>
-   </fieldset>
-   <small>Your app is available at <a href='" ?AppURL "'> " ?AppURL "</a></small>
-   </form>
-   " ] sconcat ?HTML.
-) => ( ?r tenantSubdomainForm ?HTML. ).
-?R tenantSubdomainForm "".
-
-( 
-   ?r match ( ?RID a post; path "/set-tenant-subdomain"; body ( subdomain = ?Subdomain. ); headers ( referer = ?referer.).);
-    [f3AuthSession >> match] ( sub = ?UserId. ). 
-   ?txn lmdbStartRW "./db"; lmdbDelete {?UserId tenantSubdomain ?OldSubdomain.}; lmdbInsert { ?UserId tenantSubdomain ?Subdomain. }; lmdbEnd [].
-) => ( ?r response (?RID status 302; headers ( "Location" = ?referer. ). ).  ).
 
 (
-     ?r [f3AuthSession >> match] ( sub = ?UserId. ).
+    ?R match ( 
+        ?RID a get; 
+        protocol ?Protocol; port ?Port; 
+        headers (host = ?Host. referer = ?Referer.). 
+    ); [ f3AuthSession >> match ] ( sub = ?UserId. ).
     ?Txn lmdbStartR "./db". 
-    [?Option ( 
-        ?Txn lmdbQuery { ?UserId calendar ?CalendarId. ?CalendarId name ?CalendarName.}. 
-        ["<tr><td>" ?CalendarName "</td><td><a href='/calendar/" ?CalendarId "'>Edit</a></td></tr>"] sconcat ?Option. )
-    ] collect ?Options.
+    ?Txn lmdbQuery { ?UserId tenantSubdomain ?Tenant. }.
     ?Txn lmdbEnd [].
-    system cut [].
-    ?Options sconcat ?OptionsHTML.
-    ["<table>
-    <thead>
-        <tr>
-            <th>Calendar Name</th>
-            <th>Action</th>
-        </tr>
-    </thead>
-    <tbody>
-    " ?OptionsHTML "
-    </tbody>
-    </table>"] sconcat ?SelectHTML.
-) => (?r calendarSelect ?SelectHTML.).
-?r calendarSelect "<table><thead><tr><th>Calendar Name</th><th>Action</th></tr></thead><tbody></tbody></table>".
-
-
-?R calendarForm "<form action='/create-calendar' method='post'>
-<fieldset role='group'>
-    <input type='text' placeholder='Calendar Name' name='calendarname' required>
-    <input type='submit' value='Create Calendar'>
- </fieldset>   
-    </form>".
-
-( 
-   ?r match ( ?RID a post; path "/create-calendar"; body ( calendarname = ?CalendarName. ); headers ( referer = ?referer.).);
-    [f3AuthSession >> match] ( sub = ?UserId. ). 
-   ?RID sha256 ?RIDHash.
-   ["calendar_" ?RIDHash] sconcat ?CalendarId.
-   ?txn lmdbStartRW "./db"; lmdbInsert { ?UserId calendar ?CalendarId. ?CalendarId a Calendar; name ?CalendarName. }; lmdbEnd [].
-) => ( ?r response (?RID status 302; headers ( "Location" = ?referer. ). ).  ).
+    [ ?Protocol "://" ?Tenant "." ?Host ":" ?Port ] sconcat ?URL.
+) => (
+    ?R tenantBaseUrl ?URL.
+).
 
 (
-    ?R match ( ?RID a get; path "/".); navbar ?Nav; [initTenant >> toString]  ?F3AuthSessionInfo; 
+    ?R match ( ?RID a get; path "/".);  [initTenant >> toString]  ?F3AuthSessionInfo; 
         tenantSubdomainForm ?tenantSubdomainForm;
         calendarForm ?CalendarForm;
-        calendarSelect ?CalendarSelect.
+        calendarSelect ?CalendarSelect;
+        setMainCalendarFormHTML ?MainCalendarForm.
+    system not { ?R subdomain ?Subdomain. }.
     system cut [].
     // 1@html
     [
-        ?Nav 
         "<h1>Dashboard</h1>"
         ?tenantSubdomainForm
+        ?MainCalendarForm
         ?CalendarForm
         ?CalendarSelect
         "<div>Session Info: <span>" ?F3AuthSessionInfo "</span></div>"
-    ] buildHTML ?ResponseHTML.
+    ] [buildHTML ?R] ?ResponseHTML.
 ) => ( ?R response (
     ?RID status 200; 
     headers ( "Content-Type" = "text/html; charset=utf-8". );
@@ -167,19 +114,22 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
 ). ).
 
 (
-    ?R match ( ?RID a get; path "/".); navbar ?Nav; subdomain ?Tenant. 
+    ?R match ( ?RID a get; path "/".);  subdomain ?Tenant. 
+    ?R eventsTable ?EventsTable.
     ?Txn lmdbStartR "./db"; lmdbQuery { ?User a User; name ?UserName; tenantSubdomain ?Tenant. }; lmdbEnd [].
     system cut [].
 
-    [?Nav "<h1>Welcome the calendar of " ?UserName "</h1>"] buildHTML ?ResponseHTML. 
+    ["<h1>Welcome the calendar of " ?UserName "</h1>"
+    ?EventsTable
+    ] [buildHTML ?R] ?ResponseHTML. 
 )
 => (?R response (?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". ); body ?ResponseHTML. ).).
 
-(?R match ( ?RID a get; path "/".); navbar ?Nav. [?Nav "<h1>Welcome to bbookk.io</h1>"] buildHTML ?ResponseHTML. )
+(?R match ( ?RID a get; path "/".). ["<h1>Welcome to bbookk.io</h1>"] [buildHTML ?R] ?ResponseHTML. )
 => (?R response (?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". ); body ?ResponseHTML. ).).
 
 (
-    ?R match ( ?RID a get; path ?Path.); navbar ?Nav; 
+    ?R match ( ?RID a get; path ?Path.);  
     [f3AuthSession >> match] ( sub = ?UserId. ).
     ?Path [splitString "/"] ?PathSplit.
     ?PathSplit = ["" "calendar" ?CalendarId].
@@ -190,9 +140,9 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
 
     ?R eventsTable ?EventsTable.
     
-    [?Nav "
+    ["
     <p class='breadcrumbs'><a href='/'>Home</a><span>" ?CalendarName "</span></p>
-    <h1>" ?CalendarName "</h1> " ?CreateEventButton ?EventsTable] buildHTML ?ResponseHTML.
+    <h1>" ?CalendarName "</h1> " ?CreateEventButton ?EventsTable] [buildHTML ?R] ?ResponseHTML.
 ) => (?R response (?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". ); body ?ResponseHTML. ).).
 
 
@@ -202,7 +152,6 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         ?RID a get
         ; path ?Path.
     )
-    ; navbar ?Nav
     ; [f3AuthSession >> match] ( 
         sub = ?UserId. 
     ).
@@ -244,7 +193,7 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         <input type='submit' value='Create Event'>
     </form>"] sconcat ?CreateEventForm.
     
-    [?Nav ?CreateEventForm] buildHTML ?ResponseHTML.
+    [?CreateEventForm] [buildHTML ?R] ?ResponseHTML.
 ) => (?R response (?RID status 200; headers ( "Content-Type" = "text/html; charset=utf-8". ); body ?ResponseHTML. ).).
 
 (
@@ -303,7 +252,7 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
     ?R match ( 
         ?RID a get
         ; path ?Path.
-    ); navbar ?Nav.
+    ).
     ?Path [splitString "/"] ["" "event" ?EventId ?IterationS "bookings"].
     ?Txn lmdbStartR "./db"
     ; lmdbQuery { 
@@ -391,7 +340,7 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         </tbody>
     </table>"] sconcat ?BookingsContent.
     // ?BookingsContent = "Test".
-    [?Nav ?BookingsContent] buildHTML ?ResponseHTML.
+    [?BookingsContent] [buildHTML ?R] ?ResponseHTML.
 ) => (
     ?R response (
         ?RID status 200
@@ -409,8 +358,9 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         ; headers ( 
             referer = ?RefererURL.
         ).
-    ); navbar ?Nav.
+    ).
     ?Path [splitString "/"] ["" "bookings" ?BookingId "cancel"].
+        system log [" 3 REQ CAPTURE: " ].
     
     ["<h1>Cancelling Booking...</h1>
     <p>Please wait while we process your cancellation.</p>
@@ -425,7 +375,7 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         };
     </script>"] sconcat ?CancelContent.
     
-    [?Nav ?CancelContent] buildHTML ?ResponseHTML.
+    [?CancelContent] [buildHTML ?R] ?ResponseHTML.
 ) => (
     ?R response (
         ?RID status 200
@@ -443,8 +393,9 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         ; body ( 
             referer = ?RefererURL.
         ).
-    ); navbar ?Nav.
+    ).
     ?Path [splitString "/"] ["" "bookings" ?BookingId "cancel"].
+        system log [" 2 REQ CAPTURE: " ].
     system log [DDDDDDDDDDDd 1].
     ?Txn lmdbStartRW "./db".
     ?Txn lmdbQuery { 
@@ -478,7 +429,7 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
     
     <a href='" ?RefererURL "'><button>Go Back</button></a>"] sconcat ?CancelContent.
     
-    [?Nav ?CancelContent] buildHTML ?ResponseHTML.
+    [?CancelContent] [buildHTML ?R] ?ResponseHTML.
 ) => (
     ?R response (
         ?RID status 200
@@ -493,7 +444,8 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
     ?R match ( 
         ?RID a get
         ; path ?Path.
-    ); navbar ?Nav.
+    ).
+
     ?Path [splitString "/"] ["" "event" ?EventId ?Iteration "book"].
     ?Txn lmdbStartR "./db"
     ; lmdbQuery { 
@@ -504,6 +456,7 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         ; duration ?DurationT
         ; capacity ?Capacity. 
     }; lmdbEnd [].
+        system log ["TTTTTTTTTTTTTTT 4: " ].
     
     ["<h1>Book Event: " ?EventName "</h1>
     <p>" ?Description "</p>
@@ -520,7 +473,7 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         <input type='submit' value='Book Event'>
     </form>"] sconcat ?BookingForm.
     
-    [?Nav ?BookingForm] buildHTML ?ResponseHTML.
+    [?BookingForm] [buildHTML ?R] ?ResponseHTML.
 ) => (
     ?R response (
         ?RID status 200
@@ -562,13 +515,13 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
     }
     ; lmdbEnd [].
     
-    ["/calendar/" ?CalendarId] sconcat ?RedirectPath.
-) => ( ?R response (?RID status 302; headers ( "Location" = ?RedirectPath. ). ).  ).
+    // ["/calendar/" ?CalendarId] sconcat ?RedirectPath.
+) => ( ?R response (?RID status 302; headers ( "Location" = "/". "Set-Cookie" = "toast=success:Booking successful; Path=/; Max-Age=60". ). ).  ).
 
 system runWebServer 3000.
-system query [ ?XS ( 
-     [[?class -- ?s ?p ?o] (?class = Booking. ?txn lmdbStartR "./db"; lmdbQuery { ?s a ?class; ?p ?o. }; lmdbEnd [].  )] collect ?XS.
-)].
+// system query [ ?XS ( 
+//      [[?class -- ?s ?p ?o] (?class = Booking. ?txn lmdbStartR "./db"; lmdbQuery { ?s a ?class; ?p ?o. }; lmdbEnd [].  )] collect ?XS.
+// )].
 // system query [ [subdomain ?s ?Subdomain ?p ?o] ( 
 //      ?txn lmdbStartR "./db"; lmdbQuery { ?s tenantSubdomain ?Subdomain; ?p ?o. }; lmdbEnd []. 
 // )].

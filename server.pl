@@ -122,7 +122,7 @@ handle_request(Request) :-
     % Try to match request with a rule
     (   match_request_pattern(Pattern, Response)
     ->  % Found a matching rule
-        format(user_error, "Found matching response pattern: ~w~n", [Response]),
+        format(user_error, "Found matching response pattern: ~w~n", [Path]),
         send_http_response(Response)
     ;   % No matching rule
         format(user_error, "No matching pattern for: ~w~n", [Path]),
@@ -370,7 +370,7 @@ cookie_to_triple(Name=Value, p(Name, =, ValueString)) :-
 
 % Match request pattern against defined rules
 match_request_pattern(RequestPattern, Response) :-
-    format(user_error, "Trying to match pattern: ~q~n", [RequestPattern]),
+    % format(user_error, "Trying to match pattern: ~q~n", [RequestPattern]),
     
     % Find the corresponding response
     catch(
@@ -381,7 +381,7 @@ match_request_pattern(RequestPattern, Response) :-
 
 % Send HTTP response based on matched rule
 send_http_response(graph(ResponseTriples)) :-
-    format(user_error, "Processing response: ~w~n", [ResponseTriples]),
+    % format(user_error, "Processing response: ~w~n", [ResponseTriples]),
     
     % Extract status code (default 200)
     (   memberchk(p(_, status, Status), ResponseTriples)
@@ -391,14 +391,15 @@ send_http_response(graph(ResponseTriples)) :-
     ),
     
     % Extract headers with safe parsing
-    format(user_error, "Extracting headers~n", []),
+    % format(user_error, "Extracting headers~n", []),
     findall(HeaderName-HeaderValue,
             (member(p(_, headers, graph(HeaderTriples)), ResponseTriples),
-             member(p(HeaderName, =, HeaderValue), HeaderTriples),
-             format(user_error, "Found header: ~q = ~q~n", [HeaderName, HeaderValue])
+             member(p(HeaderName, =, HeaderValue), HeaderTriples)
+            %  format(user_error, "Found header: ~q = ~q~n", [HeaderName, HeaderValue])
+            
             ),
             HeaderPairs),
-    format(user_error, "Header pairs: ~q~n", [HeaderPairs]),
+    % format(user_error, "Header pairs: ~q~n", [HeaderPairs]),
     
     % Extract body content - optional, default to empty string
     (   memberchk(p(_, body, BodyContent), ResponseTriples)
@@ -407,12 +408,12 @@ send_http_response(graph(ResponseTriples)) :-
     ),
     
     % Determine content type
-    format(user_error, "Finding content type in: ~q~n", [HeaderPairs]),
-    (   member("Content-Type"-ContentType, HeaderPairs)
-    ->  format(user_error, "Content type from headers: ~q~n", [ContentType])
-    ;   ContentType = "text/html; charset=utf-8",
-        format(user_error, "Using default content type~n", [])
-    ),
+    % format(user_error, "Finding content type in: ~q~n", [HeaderPairs]),
+    % (   member("Content-Type"-ContentType, HeaderPairs)
+    % ->  format(user_error, "Content type from headers: ~q~n", [ContentType])
+    % ;   ContentType = "text/html; charset=utf-8",
+    %     format(user_error, "Using default content type~n", [])
+    % ),
     
     % **SEND HEADERS FIRST**
     format('Status: ~w~n', [Status]),
@@ -428,13 +429,13 @@ send_http_response(graph(ResponseTriples)) :-
     % **THEN SEND BODY**
     (   is_list(BodyContent)
     ->  % This is a byte list for binary content
-        format(user_error, "Converting byte list to binary~n", []),
-        maplist(put_byte, BodyContent),
-        format(user_error, "Binary content sent~n", [])
+        % format(user_error, "Converting byte list to binary~n", []),
+        maplist(put_byte, BodyContent)
+        % format(user_error, "Binary content sent~n", [])
     ;   % Regular text content
-        format(user_error, "Sending text content~n", []),
-        write(BodyContent),
-        format(user_error, "Text content sent~n", [])
+        % format(user_error, "Sending text content~n", []),
+        write(BodyContent)
+        % format(user_error, "Text content sent~n", [])
     ),
     
     format(user_error, "Response complete~n", []).
