@@ -1,13 +1,10 @@
 (
-    ?R f3AuthWidget ?F3AuthWidget; subdomain ?Subdomain.  
-    (
-        ?R tenantSubdomainString ?Subdomain.
-        ?Links = "<li><a href='/dashboard'>Dashboard</a></li>".
-    ) or (
-        (
-            ?R f3AuthSession ?F3AuthSession. ?Links = "<li><a href='/bookings'>My Bookings</a></li>".) or (
-            ?Links = "".
-        ).
-    ).
-    ["<nav> <ul><li>bbookk.io</li></ul> <ul> <li>" ?F3AuthWidget "</li> </ul></nav>"] sconcat ?NavHTML. ) 
+    ?R f3AuthWidget ?F3AuthWidget; [hasRole >> toString] ?Role; navbarLinks ?NavbarLinks.
+    ["<nav> <ul><li>bbookk.io</li> </ul> <ul> " ?NavbarLinks "</ul> <ul>  <li>" ?F3AuthWidget "</li> </ul></nav>"] sconcat ?NavHTML. ) 
 => (?R navbar ?NavHTML.).
+
+?R navbarLinks:(?R hasRole [Admin ?UserId]. system cut [].) 
+    "<li><a href='/dashboard'>Dashboard</a></li>"
+; navbarLinks:(?R hasRole [Client ?UserId]. system cut [].) 
+    "<li><a href='/'>Calendar</a></li><li><a href='/my-bookings'>My Bookings</a></li>"
+; navbarLinks:() "".

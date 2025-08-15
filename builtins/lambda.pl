@@ -5,5 +5,11 @@ l2c([], true).
 l2c([p(system, P, [])|Xs], (!, Y)) :- \+ var(P), P = cut, !, l2c(Xs, Y).
 l2c([X|Xs], (X, Y)) :- l2c(Xs, Y).
 
-user:p(Input, [Input, graph(Facts), Output], Output) :- 
+user:p(Input, [fun, Input, ->, graph(Facts), Output], return, Output) :- 
     l2c(Facts, Conj), call(Conj).   
+
+user:p(G, =>, graph([p(X, Pred, Y)])) :- 
+    user:p(X, chain(Pred,G), Y).
+
+user(graph([p(X, Pred2, Y)]), =>, graph([p(X, Pred1, Y)])) :- 
+    user:p(Pred1, <-, Pred2).

@@ -1,0 +1,14 @@
+?R hasRole:(
+    ?R subdomain ?Subdomain; [f3AuthSession >> match ] ( sub = ?UserId. ). 
+    ?txn lmdbStartR "./db"; lmdbQuery { ?UserId tenantSubdomain ?s. }; lmdbEnd [].
+    system cut [].
+) [Admin ?UserId]
+; hasRole:(
+    system not { ?R subdomain ?S. }. ?R [f3AuthSession >> match ] ( sub = ?UserId. ). 
+    system cut [].
+) [Admin ?UserId]
+; hasRole:( 
+    ?R [f3AuthSession >> match ] ( sub = ?UserId. ).  
+    system cut [].
+) [Client ?UserId]
+; hasRole:() Guest.

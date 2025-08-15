@@ -1,0 +1,107 @@
+(
+    ?R match ( 
+        ?RID a get; 
+        path "/my-bookings".
+    );
+    [f3AuthSession >> match] ( sub = ?UserId. email = ?UserEmail. ).
+    
+    ?Txn lmdbStartR "./db".
+    
+    [?BookingRow (
+        ?Txn lmdbQuery { 
+            ?BookingId a Booking
+            ; email ?UserEmail
+            ; event ?EventId
+            ; iteration ?Iteration
+            ; name ?BookingName
+            ; phone ?BookingPhone.
+        }.
+        
+        system log [xxxxxxxxaaaaaaaaaa booking for user ?UserEmail is ?BookingId ].
+        // Get event details
+        ?Txn lmdbQuery {
+            ?EventId name ?EventName
+            ; description ?Description
+            ; start ?EventStartTF
+            ; duration ?DurationT
+            ; capacity ?Capacity.
+        }.
+        
+system log [xxxxxxaaaaaaaaaaaaaaa 1 ?CalendarId ?EventId].
+        ?EventStartTF truncate ?EventStartT.
+        time secondsPerWeek ?SecondsPerWeek.
+        clpfd constraint [
+            ?EventStartT + ?Iteration * ?SecondsPerWeek = ?EventIterationStartT
+        ].
+        clpfd label [?EventIterationStartT].
+system log [xxxxxxaaaaaaaaaaaaaaa 2].
+        ?EventIterationStartT [timeStampToString "%a, %d %b %Y %H:%M"] ?EventIterationStartStr.
+        ?EventIterationStartT [+ ?DurationT] ?EventIterationEndT.
+        ?EventIterationEndT [timeStampToString "%H:%M"] ?EventIterationEndStr.
+        
+system log [xxxxxxaaaaaaaaaaaaaaa 3].
+        // Check if booking is cancelled
+        (
+            ?Txn lmdbQuery {
+                ?BookingId cancelled ?CTime. 
+            }. 
+            ?CTime [timeStampToString "%d %b %Y %H:%M"] ?CancelledTime.
+            ["Cancelled on " ?CancelledTime] sconcat ?StatusCell.
+            ?ActionCell = "---".
+        ) or (
+            ?StatusCell = "Active".
+            ["<a href='/bookings/" ?BookingId "/cancel' style='color: red;'>Cancel</a>"] sconcat ?ActionCell.
+        ).
+        
+system log [xxxxxxaaaaaaaaaaaaaaa 4].
+        // Get booking timestamp
+        ( 
+            ?Txn lmdbQuery {
+                ?BookingId timeStamp ?BookingTimeStamp. 
+            }.
+            ?BookingTimeStamp [timeStampToString "%d %b %Y %H:%M"]  ?BookingTimeStampStr.
+        ) or ( 
+            ?BookingTimeStampStr = "---".
+        ).
+system log [xxxxxxaaaaaaaaaaaaaaa 5].
+        ["<tr>
+            <td>" ?EventName "</td>
+            <td>" ?Description "</td>
+            <td>" ?EventIterationStartStr " - " ?EventIterationEndStr "</td>
+            <td>" ?BookingTimeStampStr "</td>
+            <td>" ?StatusCell "</td>
+            <td>" ?ActionCell "</td>
+        </tr>"] sconcat ?BookingRow.
+        system log [xxxxxxxxaaaaaaaaaa booking row for user ?UserEmail is ?BookingRow ].
+    )] [collect >> sconcat] ?BookingRows.
+    
+    ?Txn lmdbEnd [].
+    
+    ["<h1>My Bookings</h1>
+    <p>Here are all your booked events:</p>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Event Name</th>
+                <th>Description</th>
+                <th>Date & Time</th>
+                <th>Booked At</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            " ?BookingRows "
+        </tbody>
+    </table>"] sconcat ?MyBookingsContent.
+    
+    [?MyBookingsContent] [buildHTML ?R] ?ResponseHTML.
+) => (
+    ?R response (
+        ?RID status 200
+        ; headers ( 
+            "Content-Type" = "text/html; charset=utf-8". 
+        ); body ?ResponseHTML. 
+    ).
+).

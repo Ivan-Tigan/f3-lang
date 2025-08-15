@@ -1,4 +1,4 @@
-system include "./f3auth.f3", "./time.f3", "./events-table.f3", "./set-main-calendar.f3", "./set-tenant-subdomain.f3", "./create-calendar.f3", "./toast.f3", "./navbar.f3".
+system include "./roles.f3", "./f3auth.f3", "./time.f3", "./events-table.f3", "./set-main-calendar.f3", "./set-tenant-subdomain.f3", "./create-calendar.f3", "./toast.f3", "./navbar.f3", "./my-bookings.f3".
 f3Auth encryptionSecretKey "Some secret key";
     clientId "0xdrjgnfvjdpn7wfgs1z2";
     clientSecret "CDlhWVPjoX0K6yZe9BDuajrRgEsbZ3DI";
@@ -115,8 +115,11 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
 
 (
     ?R match ( ?RID a get; path "/".);  subdomain ?Tenant. 
+    system log [hooomeeepaaageeee 1].
     ?R eventsTable ?EventsTable.
+    system log [hooomeeepaaageeee 2].
     ?Txn lmdbStartR "./db"; lmdbQuery { ?User a User; name ?UserName; tenantSubdomain ?Tenant. }; lmdbEnd [].
+    system log [hooomeeepaaageeee 3].
     system cut [].
 
     ["<h1>Welcome the calendar of " ?UserName "</h1>"
@@ -497,10 +500,12 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         ).
     ).
     ?Path [splitString "/"] ["" "event" ?EventId ?IterationS "book"].
+    system log [booooooooooooook 1].
     ?IterationS parseInteger ?Iteration.
     ?RID sha256 ?RIDHash.
     ["booking_" ?RIDHash] sconcat ?BookingId.
     system [now >> truncate] ?TimeStamp.
+    system log [booooooooooooook 2].
 
     ?txn lmdbStartRW "./db"
     ; lmdbQuery { ?CalendarId event ?EventId. }
@@ -516,8 +521,9 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
     ; lmdbEnd [].
     
     // ["/calendar/" ?CalendarId] sconcat ?RedirectPath.
+    system log [booooooooooooook 4].
 ) => ( ?R response (?RID status 302; headers ( "Location" = "/". "Set-Cookie" = "toast=success:Booking successful; Path=/; Max-Age=60". ). ).  ).
-
+system debug listing.
 system runWebServer 3000.
 // system query [ ?XS ( 
 //      [[?class -- ?s ?p ?o] (?class = Booking. ?txn lmdbStartR "./db"; lmdbQuery { ?s a ?class; ?p ?o. }; lmdbEnd [].  )] collect ?XS.

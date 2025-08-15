@@ -79,7 +79,7 @@ const pChain: P.Parser<{ type: "chain"; nodes: Node[] }> = P.sepBy1(
 
 const pGraph = P.string("(")
   .skip(ws)
-  .then(P.lazy(() => pTriples()))
+  .then(P.lazy(() => pTriples().or(P.succeed([]))))
   .skip(ws.then(P.string(")")))
   .map((triples) => ({ type: "graph", triples }));
 
