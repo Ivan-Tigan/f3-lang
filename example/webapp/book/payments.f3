@@ -1,0 +1,565 @@
+// Payment Methods Management Page
+(
+    ?R match ( 
+        ?RID a get; 
+        path "/payment-methods".
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Txn lmdbStartR "./db".
+    
+    // Get all payment methods for this tenant
+    [?PaymentMethodRow (
+        ?Txn lmdbQuery { 
+            ?PaymentMethodId a PaymentMethod;
+            tenantSubdomain ?Tenant;
+            label ?PaymentMethodLabel.
+        }.
+        
+        // Count revenue shares for this payment method
+        [?RevShareId (
+            ?Txn lmdbQuery {
+                ?RevShareId a RevenueShare;
+                paymentMethod ?PaymentMethodId.
+            }.
+        )] [collect >> length] ?RevShareCount.
+        
+        [?RevShareCount " revenue shares"] sconcat ?RevSharesText.
+        
+        ["<tr>
+            <td>" ?PaymentMethodLabel "</td>
+            <td>" ?RevSharesText "</td>
+            <td>
+                <a href='/payment-methods/edit/" ?PaymentMethodId "'><button type='button'>Edit</button></a>
+                <form method='post' action='/payment-methods/delete/" ?PaymentMethodId "' style='display: inline; margin-left: 0.5rem;' onsubmit='return confirm(\"Are you sure you want to delete this payment method?\");'>
+                    <button type='submit' style='background-color: #dc3545; border-color: #dc3545;'>Delete</button>
+                </form>
+            </td>
+        </tr>"] sconcat ?PaymentMethodRow.
+    )] [collect >> sconcat] ?PaymentMethodRows.
+    
+    ?Txn lmdbEnd [].
+    
+    ["<h1>Payment Methods</h1>
+    
+    <div style='margin-bottom: 1rem;'>
+        <form action='/payment-methods/create' method='post' style='display: inline-block;'>
+            <fieldset role='group'>
+                <input type='text' placeholder='Payment Method Label' name='label' required>
+                <input type='submit' value='Add Payment Method'>
+            </fieldset>
+        </form>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Label</th>
+                <th>Revenue Shares</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            " ?PaymentMethodRows "
+        </tbody>
+    </table>"] sconcat ?PaymentMethodListContent.
+    
+    [?PaymentMethodListContent] [buildHTML ?R] ?ResponseHTML.
+) => (
+    ?R response (
+        ?RID status 200;
+        headers ( "Content-Type" = "text/html; charset=utf-8". );
+        body ?ResponseHTML.
+    ).
+).
+
+// Payment Method Creation POST
+(
+    ?R match ( 
+        ?RID a post;
+        path "/payment-methods/create";
+        body ?Body.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Body match (label = ?PaymentMethodLabel.).
+    
+    ?RID sha256 ?RIDHash.
+    ["payment_method_" ?RIDHash] sconcat ?PaymentMethodId.
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Create payment method
+    ?Txn lmdbInsert { 
+        ?PaymentMethodId a PaymentMethod;
+        label ?PaymentMethodLabel;
+        tenantSubdomain ?Tenant.
+    }.
+    
+    ?Txn lmdbEnd [].
+    
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = "/payment-methods".
+            "Set-Cookie" = "toast=success:Payment method created successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).
+
+// Payment Method Edit Form (with Revenue Shares Management)
+(
+    ?R match ( 
+        ?RID a get; 
+        path ?Path.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Path [splitString "/"] ["" "payment-methods" "edit" ?PaymentMethodId].
+    
+    ?Txn lmdbStartR "./db".
+    
+    // Get payment method details
+    ?Txn lmdbQuery { 
+        ?PaymentMethodId a PaymentMethod;
+        label ?PaymentMethodLabel;
+        tenantSubdomain ?Tenant.
+    }.
+    
+    // Get all events for dropdown
+    [?EventOption (
+        ?Txn lmdbQuery { 
+            ?AdminUserId calendar ?CalendarId.
+            ?CalendarId name ?CalendarName;
+            event ?EventId.
+            ?EventId name ?EventName.
+        }.
+        
+        ["<option value='" ?EventId "'>" ?EventName " (" ?CalendarName ")</option>"] sconcat ?EventOption.
+    )] [collect >> sconcat] ?EventOptions.
+    
+    // Get all staff members for dropdown
+    [?StaffOption (
+        ?Txn lmdbQuery { 
+            ?StaffId a Staff;
+            tenantSubdomain ?Tenant;
+            email ?StaffEmail.
+        }.
+        
+        ["<option value='" ?StaffId "'>" ?StaffEmail "</option>"] sconcat ?StaffOption.
+    )] [collect >> sconcat] ?StaffOptions.
+    
+    // Get all revenue shares for this payment method
+    [?RevShareRow (
+        ?Txn lmdbQuery {
+            ?RevShareId a RevenueShare;
+            paymentMethod ?PaymentMethodId;
+            event ?CurrentEventId;
+            recipient ?CurrentStaffId;
+            amount ?CurrentAmount.
+        }.
+        
+        // Generate event options for this row
+        [?EventRowOption (
+            ?Txn lmdbQuery { 
+                ?AdminUserId calendar ?CalendarId.
+                ?CalendarId name ?CalendarName;
+                event ?EventId.
+                ?EventId name ?EventName.
+            }.
+            
+            (
+                ?EventId = ?CurrentEventId.
+                ?EventSelected = "selected".
+            ) or (
+                ?EventSelected = "".
+            ).
+            
+            ["<option value='" ?EventId "' " ?EventSelected ">" ?EventName " (" ?CalendarName ")</option>"] sconcat ?EventRowOption.
+        )] [collect >> sconcat] ?EventRowOptions.
+        
+        // Generate staff options for this row
+        [?StaffRowOption (
+            ?Txn lmdbQuery { 
+                ?StaffId a Staff;
+                tenantSubdomain ?Tenant;
+                email ?StaffEmail.
+            }.
+            
+            (
+                ?StaffId = ?CurrentStaffId.
+                ?StaffSelected = "selected".
+            ) or (
+                ?StaffSelected = "".
+            ).
+            
+            ["<option value='" ?StaffId "' " ?StaffSelected ">" ?StaffEmail "</option>"] sconcat ?StaffRowOption.
+        )] [collect >> sconcat] ?StaffRowOptions.
+        
+        ["revshare_form_" ?RevShareId] sconcat ?FormId.
+        
+        ["<tr>
+            <td>
+                <select name='event' form='" ?FormId "' required>
+                    <option value=''>Select event...</option>
+                    " ?EventRowOptions "
+                </select>
+            </td>
+            <td>
+                <select name='recipient' form='" ?FormId "' required>
+                    <option value=''>Select staff...</option>
+                    " ?StaffRowOptions "
+                </select>
+            </td>
+            <td>
+                <input type='number' name='amount' form='" ?FormId "' step='0.01' min='0' value='" ?CurrentAmount "' required style='width: 100px;'>
+            </td>
+            <td>
+                <form id='" ?FormId "' method='post' action='/revenue-shares/edit/" ?RevShareId "' style='display: inline;'>
+                    <button type='submit'>Save</button>
+                </form>
+                <form method='post' action='/revenue-shares/delete/" ?RevShareId "' style='display: inline; margin-left: 0.5rem;' onsubmit='return confirm(\"Are you sure you want to delete this revenue share?\");'>
+                    <button type='submit' style='background-color: #dc3545; border-color: #dc3545;'>Delete</button>
+                </form>
+            </td>
+        </tr>"] sconcat ?RevShareRow.
+    )] [collect >> sconcat] ?RevShareRows.
+    
+    ?Txn lmdbEnd [].
+    
+    ["<h1>Edit Payment Method</h1>
+    
+    <form action='/payment-methods/edit/" ?PaymentMethodId "' method='post'>
+        <fieldset role='group'>
+            <input type='text' name='label' value='" ?PaymentMethodLabel "' required>
+            <input type='submit' value='Update'>
+        </fieldset>
+    </form>
+    
+    <hr>
+    
+    <h2>Revenue Shares</h2>
+    
+    <form action='/payment-methods/" ?PaymentMethodId "/revenue-shares/create' method='post' style='margin-bottom: 1rem;'>
+        <fieldset>
+            <legend>Add Revenue Share</legend>
+            <div style='display: grid; grid-template-columns: 1fr 1fr 100px auto; gap: 0.5rem; align-items: end;'>
+                <div>
+                    <label for='event'>Event</label>
+                    <select id='event' name='event' required>
+                        <option value=''>Select event...</option>
+                        " ?EventOptions "
+                    </select>
+                </div>
+                <div>
+                    <label for='recipient'>Recipient</label>
+                    <select id='recipient' name='recipient' required>
+                        <option value=''>Select staff...</option>
+                        " ?StaffOptions "
+                    </select>
+                </div>
+                <div>
+                    <label for='amount'>Amount</label>
+                    <input type='number' id='amount' name='amount' step='0.01' min='0' required>
+                </div>
+                <div>
+                    <input type='submit' value='Add'>
+                </div>
+            </div>
+        </fieldset>
+    </form>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Event</th>
+                <th>Recipient</th>
+                <th>Amount</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            " ?RevShareRows "
+        </tbody>
+    </table>"] sconcat ?EditPaymentMethodForm.
+    
+    [?EditPaymentMethodForm] [buildHTML ?R] ?ResponseHTML.
+) => (
+    ?R response (
+        ?RID status 200;
+        headers ( "Content-Type" = "text/html; charset=utf-8". );
+        body ?ResponseHTML.
+    ).
+).
+
+// Payment Method Edit POST
+(
+    ?R match ( 
+        ?RID a post;
+        path ?Path;
+        body ?Body.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Path [splitString "/"] ["" "payment-methods" "edit" ?PaymentMethodId].
+    ?Body match (label = ?PaymentMethodLabel.).
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Update payment method label
+    ?Txn lmdbDelete { ?PaymentMethodId label ?_OldLabel. }.
+    ?Txn lmdbInsert { ?PaymentMethodId label ?PaymentMethodLabel. }.
+    
+    ?Txn lmdbEnd [].
+    
+    ["/payment-methods/edit/" ?PaymentMethodId] sconcat ?RedirectPath.
+    
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = ?RedirectPath.
+            "Set-Cookie" = "toast=success:Payment method updated successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).
+
+// Payment Method Delete POST
+(
+    ?R match ( 
+        ?RID a post;
+        path ?Path.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Path [splitString "/"] ["" "payment-methods" "delete" ?PaymentMethodId].
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Delete all revenue shares for this payment method
+    [1 (
+        ?Txn lmdbQuery { 
+            ?RevShareId a RevenueShare;
+            paymentMethod ?PaymentMethodId.
+        }.
+        ?Txn lmdbDelete { ?RevShareId ?P ?O. }.
+    )] collect ?_.
+    
+    // Delete payment method
+    ?Txn lmdbDelete { ?PaymentMethodId ?P ?O. }.
+    
+    ?Txn lmdbEnd [].
+    
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = "/payment-methods".
+            "Set-Cookie" = "toast=success:Payment method deleted successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).
+
+// Revenue Share Creation Form
+(
+    ?R match ( 
+        ?RID a get; 
+        path ?Path.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Path [splitString "/"] ["" "payment-methods" ?PaymentMethodId "revenue-shares" "create"].
+    
+    ?Txn lmdbStartR "./db".
+    
+    // Get payment method details
+    ?Txn lmdbQuery { 
+        ?PaymentMethodId a PaymentMethod;
+        label ?PaymentMethodLabel;
+        tenantSubdomain ?Tenant.
+    }.
+    
+    // Get all events for dropdown
+    [?EventOption (
+        ?Txn lmdbQuery { 
+            ?AdminUserId calendar ?CalendarId.
+            ?CalendarId name ?CalendarName;
+            event ?EventId.
+            ?EventId name ?EventName.
+        }.
+        
+        ["<option value='" ?EventId "'>" ?EventName " (" ?CalendarName ")</option>"] sconcat ?EventOption.
+    )] [collect >> sconcat] ?EventOptions.
+    
+    // Get all staff members for dropdown
+    [?StaffOption (
+        ?Txn lmdbQuery { 
+            ?StaffId a Staff;
+            tenantSubdomain ?Tenant;
+            email ?StaffEmail.
+        }.
+        
+        ["<option value='" ?StaffId "'>" ?StaffEmail "</option>"] sconcat ?StaffOption.
+    )] [collect >> sconcat] ?StaffOptions.
+    
+    ?Txn lmdbEnd [].
+    
+    ["<h1>Add Revenue Share for " ?PaymentMethodLabel "</h1>
+    
+    <form action='/payment-methods/" ?PaymentMethodId "/revenue-shares/create' method='post'>
+        <label for='event'>Event</label>
+        <select id='event' name='event' required>
+            <option value=''>Select an event...</option>
+            " ?EventOptions "
+        </select>
+        
+        <label for='recipient'>Recipient (Staff Member)</label>
+        <select id='recipient' name='recipient' required>
+            <option value=''>Select a staff member...</option>
+            " ?StaffOptions "
+        </select>
+        
+        <label for='amount'>Amount</label>
+        <input type='number' id='amount' name='amount' step='0.01' min='0' required>
+        
+        <input type='submit' value='Create Revenue Share'>
+        <a href='/payment-methods/edit/" ?PaymentMethodId "'><button type='button'>Cancel</button></a>
+    </form>"] sconcat ?CreateRevShareForm.
+    
+    [?CreateRevShareForm] [buildHTML ?R] ?ResponseHTML.
+) => (
+    ?R response (
+        ?RID status 200;
+        headers ( "Content-Type" = "text/html; charset=utf-8". );
+        body ?ResponseHTML.
+    ).
+).
+
+// Revenue Share Creation POST
+(
+    ?R match ( 
+        ?RID a post;
+        path ?Path;
+        body ?Body.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Path [splitString "/"] ["" "payment-methods" ?PaymentMethodId "revenue-shares" "create"].
+    ?Body match (event = ?EventId. recipient = ?StaffId. amount = ?Amount.).
+    
+    ?RID sha256 ?RIDHash.
+    ["revenue_share_" ?RIDHash] sconcat ?RevShareId.
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Create revenue share
+    ?Txn lmdbInsert { 
+        ?RevShareId a RevenueShare;
+        paymentMethod ?PaymentMethodId;
+        event ?EventId;
+        recipient ?StaffId;
+        amount ?Amount.
+    }.
+    
+    ?Txn lmdbEnd [].
+    
+    ["/payment-methods/edit/" ?PaymentMethodId] sconcat ?RedirectPath.
+    
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = ?RedirectPath.
+            "Set-Cookie" = "toast=success:Revenue share created successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).
+
+
+// Revenue Share Edit POST
+(
+    ?R match ( 
+        ?RID a post;
+        path ?Path;
+        body ?Body.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Path [splitString "/"] ["" "revenue-shares" "edit" ?RevShareId].
+    ?Body match (event = ?EventId. recipient = ?StaffId. amount = ?Amount.).
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Get payment method ID for redirect
+    ?Txn lmdbQuery {
+        ?RevShareId paymentMethod ?PaymentMethodId.
+    }.
+    
+    // Update revenue share
+    ?Txn lmdbDelete { ?RevShareId event ?_OldEvent. }.
+    ?Txn lmdbDelete { ?RevShareId recipient ?_OldRecipient. }.
+    ?Txn lmdbDelete { ?RevShareId amount ?_OldAmount. }.
+    
+    ?Txn lmdbInsert { 
+        ?RevShareId event ?EventId;
+        recipient ?StaffId;
+        amount ?Amount.
+    }.
+    
+    ?Txn lmdbEnd [].
+    
+    ["/payment-methods/edit/" ?PaymentMethodId] sconcat ?RedirectPath.
+    
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = ?RedirectPath.
+            "Set-Cookie" = "toast=success:Revenue share updated successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).
+
+// Revenue Share Delete POST
+(
+    ?R match ( 
+        ?RID a post;
+        path ?Path.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Path [splitString "/"] ["" "revenue-shares" "delete" ?RevShareId].
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Get payment method ID for redirect
+    ?Txn lmdbQuery {
+        ?RevShareId paymentMethod ?PaymentMethodId.
+    }.
+    
+    // Delete revenue share
+    ?Txn lmdbDelete { ?RevShareId ?P ?O. }.
+    
+    ?Txn lmdbEnd [].
+    
+    ["/payment-methods/edit/" ?PaymentMethodId] sconcat ?RedirectPath.
+    
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = ?RedirectPath.
+            "Set-Cookie" = "toast=success:Revenue share deleted successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).

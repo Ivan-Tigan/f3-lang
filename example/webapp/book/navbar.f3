@@ -4,7 +4,7 @@
 => (?R navbar ?NavHTML.).
 
 ?R navbarLinks:(?R hasRole [Admin ?UserId]. system cut [].) 
-    "<li><a href='/dashboard'>Dashboard</a></li><li><a href='/staff'>Staff</a></li>"
+    "<li><a href='/dashboard'>Dashboard</a></li><li><a href='/staff'>Staff</a></li><li><a href='/payment-methods'>Payment Methods</a></li>"
 ; navbarLinks:(?R hasRole [Client ?UserId]. system cut [].) 
     "<li><a href='/'>Calendar</a></li><li><a href='/my-bookings'>My Bookings</a></li>"
 ; navbarLinks:() "".
