@@ -77,14 +77,19 @@
                 }.
             )] [collect >> length] ?Bookings.
 
+            // Role-based actions: Admin gets all, Staff gets book+bookings for their events, others get book only
             (
-                ?IsAdmin = true.
+                ?R hasRole [Admin ?UserId].
                 ["<a href='/event/" ?EventId "/" ?Iteration "/book'>Book</a>
                     <a href='/event/" ?EventId "/" ?Iteration "/bookings'>Bookings</a>
                     <a href='/event/" ?EventId "/" ?Iteration "/edit'>Edit</a>"] sconcat ?ActionsHTML.
+            ) or ((
+                ?R hasRole [Staff ?UserId ?StaffId]; canAccessEvent ?EventId.
+                ["<a href='/event/" ?EventId "/" ?Iteration "/book'>Book</a>
+                    <a href='/event/" ?EventId "/" ?Iteration "/bookings'>Bookings</a>"] sconcat ?ActionsHTML.
             ) or (
                 ["<a href='/event/" ?EventId "/" ?Iteration "/book'>Book</a>"] sconcat ?ActionsHTML.
-            ).
+            ).).
 
             ["<div style='display: flex; justify-content: space-between; flex-direction:column; '>
             <div style='display: flex; justify-content: space-between;'>

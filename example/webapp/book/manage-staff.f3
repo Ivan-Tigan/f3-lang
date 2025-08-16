@@ -1,0 +1,337 @@
+// Staff Management Page
+(
+    ?R match ( 
+        ?RID a get; 
+        path "/staff".
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Txn lmdbStartR "./db".
+    
+    // Get all staff members for this tenant
+    [?StaffRow (
+        ?Txn lmdbQuery { 
+            ?StaffId a Staff;
+            tenantSubdomain ?Tenant;
+            email ?StaffEmail.
+        }.
+        system log [xxxxxxxxaaaaaaaaaa staff member is ?StaffId with email ?StaffEmail].
+        // Get associated events - just show count for now
+        [?EventId (
+            ?Txn lmdbQuery {
+                ?StaffId associatedEvent ?EventId.
+            }.
+        )] [collect >> length] ?EventCount.
+        system log [xxxxxxxxaaaaaaaaaa staff member has ?EventCount associated events].
+        ["Associated with " ?EventCount " events"] sconcat ?EventsList.
+        system log [xxxxxxxxaaaaaaaaaa staff member has ?EventCount associated events].
+        ["<tr>
+            <td>" ?StaffEmail "</td>
+            <td>" ?EventsList "</td>
+            <td>
+                <a href='/staff/edit/" ?StaffId "'><button type='button'>Edit</button></a>
+                <form method='post' action='/staff/delete/" ?StaffId "' style='display: inline; margin-left: 0.5rem;' onsubmit='return confirm(\"Are you sure you want to delete this staff member?\");'>
+                    <button type='submit' style='background-color: #dc3545; border-color: #dc3545;'>Delete</button>
+                </form>
+            </td>
+        </tr>"] sconcat ?StaffRow.
+    )] [collect >> sconcat] ?StaffRows.
+    
+    ?Txn lmdbEnd [].
+    
+    ["<h1>Staff Management</h1>
+    
+    <div style='margin-bottom: 1rem;'>
+        <a href='/staff/create'><button>Add New Staff Member</button></a>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Associated Events</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            " ?StaffRows "
+        </tbody>
+    </table>"] sconcat ?StaffListContent.
+    
+    [?StaffListContent] [buildHTML ?R] ?ResponseHTML.
+) => (
+    ?R response (
+        ?RID status 200;
+        headers ( "Content-Type" = "text/html; charset=utf-8". );
+        body ?ResponseHTML.
+    ).
+).
+
+// Staff Creation Form
+(
+    ?R match ( 
+        ?RID a get; 
+        path "/staff/create".
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Txn lmdbStartR "./db".
+    
+    // Get all events for this tenant to show as checkboxes
+    [?EventCheckbox (
+        ?Txn lmdbQuery { 
+            ?CalendarId name ?CalendarName;
+            event ?EventId.
+            ?EventId name ?EventName.
+            ?CalendarId tenantSubdomain ?Tenant.
+        }.
+        
+        ["<label>
+            <input type='checkbox' name='events' value='" ?EventId "'>
+            " ?EventName " (" ?CalendarName ")
+        </label>"] sconcat ?EventCheckbox.
+    )] [collect >> sconcat] ?EventCheckboxes.
+    
+    ?Txn lmdbEnd [].
+    
+    ["<h1>Add New Staff Member</h1>
+    
+    <form action='/staff/create' method='post'>
+        <label for='email'>Email Address</label>
+        <input type='email' id='email' name='email' required>
+        
+        <fieldset>
+            <legend>Associated Events</legend>
+            " ?EventCheckboxes "
+        </fieldset>
+        
+        <input type='submit' value='Create Staff Member'>
+        <a href='/staff'><button type='button'>Cancel</button></a>
+    </form>"] sconcat ?CreateStaffForm.
+    
+    [?CreateStaffForm] [buildHTML ?R] ?ResponseHTML.
+) => (
+    ?R response (
+        ?RID status 200;
+        headers ( "Content-Type" = "text/html; charset=utf-8". );
+        body ?ResponseHTML.
+    ).
+).
+
+// Staff Creation POST
+(
+    ?R match ( 
+        ?RID a post;
+        path "/staff/create";
+        body ?Body.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Body match (email = ?StaffEmail.).
+    
+    ?RID sha256 ?RIDHash.
+    ["staff_" ?RIDHash] sconcat ?StaffId.
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Create staff member
+    ?Txn lmdbInsert { 
+        ?StaffId a Staff;
+        email ?StaffEmail;
+        tenantSubdomain ?Tenant.
+    }.
+    
+    // Associate with selected events
+    [?AssocEvent (
+        ?Body match (events = ?EventId.).
+        ?Txn lmdbInsert {
+            ?StaffId associatedEvent ?EventId.
+        }.
+    )] collect ?_.
+    
+    ?Txn lmdbEnd [].
+    
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = "/staff".
+            "Set-Cookie" = "toast=success:Staff member created successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).
+
+// Staff Edit Form
+(
+    ?R match ( 
+        ?RID a get; 
+        path ?Path.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Path [splitString "/"] ["" "staff" "edit" ?StaffId].
+    
+    ?Txn lmdbStartR "./db".
+    
+    // Get staff details
+    ?Txn lmdbQuery { 
+        ?StaffId a Staff;
+        email ?StaffEmail;
+        tenantSubdomain ?Tenant.
+    }.
+    
+    // Get all events for this tenant to show as checkboxes
+    [?EventCheckbox (
+        ?Txn lmdbQuery { 
+            ?AdminUserId calendar ?CalendarId.
+            ?CalendarId name ?CalendarName;
+            event ?EventId.
+            ?EventId name ?EventName.
+        }.
+        
+        // Check if this event is already associated with the staff member
+        (
+            ?Txn lmdbQuery {
+                ?StaffId associatedEvent ?EventId.
+            }.
+            ?Checked = "checked".
+        ) or (
+            ?Checked = "".
+        ).
+        
+        ["<label>
+            <input type='checkbox' name='events' value='" ?EventId "' " ?Checked ">
+            " ?EventName " (" ?CalendarName ")
+        </label>"] sconcat ?EventCheckbox.
+    )] [collect >> sconcat] ?EventCheckboxes.
+    
+    ?Txn lmdbEnd [].
+    
+    ["<h1>Edit Staff Member</h1>
+    
+    <form action='/staff/edit/" ?StaffId "' method='post'>
+        <label for='email'>Email Address</label>
+        <input type='email' id='email' name='email' value='" ?StaffEmail "' required>
+        
+        <fieldset>
+            <legend>Associated Events</legend>
+            " ?EventCheckboxes "
+        </fieldset>
+        
+        <input type='submit' value='Update Staff Member'>
+        <a href='/staff'><button type='button'>Cancel</button></a>
+    </form>"] sconcat ?EditStaffForm.
+    
+    [?EditStaffForm] [buildHTML ?R] ?ResponseHTML.
+) => (
+    ?R response (
+        ?RID status 200;
+        headers ( "Content-Type" = "text/html; charset=utf-8". );
+        body ?ResponseHTML.
+    ).
+).
+
+// Staff Edit POST
+(
+    ?R match ( 
+        ?RID a post;
+        path ?Path;
+        body ?Body.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Body toString ?BodyString.
+    system log [xxxxxxxxaaaaaaaaaa editing staff member ?Body].
+
+    ?Path [splitString "/"] ["" "staff" "edit" ?StaffId].
+    ?Body match (email = ?StaffEmail.).
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Update staff email
+    ?Txn lmdbDelete { ?StaffId email ?_OldEmail. }.
+    ?Txn lmdbInsert { ?StaffId email ?StaffEmail. }.
+    system log [xxxxxxxxaaaaaaaaaa updated staff member email to ?StaffEmail].
+    // Remove all existing event associations
+    [1 (
+        ?Txn lmdbQuery { ?StaffId associatedEvent ?EventId. }.
+        ?Txn lmdbDelete { ?StaffId associatedEvent ?EventId. }.
+    )] collect ?_1.
+    system log [xxxxxxxxaaaaaaaaaa removed all event associations for staff member ?StaffId].
+    // Add new event associations
+    [1 (
+        ?Body match (events = ?EventId.).
+
+        system log [xxxxxxxxaaaaaaaaaa associating staff member ?StaffId with event ?EventId].
+        ?Txn lmdbInsert {
+            ?StaffId associatedEvent ?EventId.
+        }.
+    )] collect ?_2.
+    
+    ?Txn lmdbEnd [].
+    system log [xxxxxxxxaaaaaaaaaa updated staff member ?StaffId].
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = "/staff".
+            "Set-Cookie" = "toast=success:Staff member updated successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).
+
+// Staff Delete POST
+(
+    ?R match ( 
+        ?RID a post;
+        path ?Path.
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?Path [splitString "/"] ["" "staff" "delete" ?StaffId].
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Delete all staff data
+    ?Txn lmdbDelete { ?StaffId ?P ?O. }.
+    
+    ?Txn lmdbEnd [].
+    
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = "/staff".
+            "Set-Cookie" = "toast=success:Staff member deleted successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).
+
+// Enhanced role checking for staff members
+?R hasRole:(
+    ?R subdomain ?Subdomain; [f3AuthSession >> match ] ( sub = ?UserId. email = ?UserEmail. ).
+    ?txn lmdbStartR "./db"; 
+    lmdbQuery { 
+        ?StaffId a Staff;
+        email ?UserEmail;
+        tenantSubdomain ?Subdomain.
+    }; 
+    lmdbEnd [].
+    system cut [].
+) [Staff ?UserId ?StaffId].
+
+// Check if staff member can access specific event
+?R canAccessEvent:(
+    ?R hasRole [Staff ?UserId ?StaffId].
+    ?txn lmdbStartR "./db"; 
+    lmdbQuery { 
+        ?StaffId associatedEvent ?EventId.
+    }; 
+    lmdbEnd [].
+) ?EventId.

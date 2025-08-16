@@ -8,9 +8,9 @@
 % Main pattern matching predicate 
 user:p(graph(Facts), match, graph(PatternTriples)) :-
     % format(user_error, "Matching facts ~q against pattern ~q~n", [Facts, PatternTriples]),
-    match_triples(Facts, PatternTriples),
+    match_triples(Facts, PatternTriples)
     % format(user_error, "Match successful~n", []),
-    !.
+    .
 
 % Base case - empty pattern always matches
 match_triples(_, []) :- !.
