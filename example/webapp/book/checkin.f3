@@ -1,0 +1,212 @@
+// Check-in Management Page
+(
+    ?R match ( 
+        ?RID a get; 
+        path "/checkin".
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    system log [vvvvvvvvv ?R].
+    // Get date parameter or use current date
+    (
+        ?R match (?RID params ( date = ?DateStr. ). ).
+        system log [found date params ?DateStr].
+        ?DateStr [parseTimeStamp >> truncate] ?SelectedDate.
+    ) or (
+        system [now >> dayStart] ?SelectedDate.
+    ).
+    system log [ xxxx1 ].
+    
+    ?SelectedDate [timeStampToString "%Y-%m-%d"] ?SelectedDateStr.
+    
+    system log [ xxxx2 ?SelectedDateStr ].
+    ?Txn lmdbStartR "./db".
+    
+    // Get all payment methods for this tenant
+    [?PaymentMethod (
+        ?Txn lmdbQuery { 
+            ?PaymentMethodId a PaymentMethod;
+            tenantSubdomain ?Tenant;
+            label ?PaymentMethodLabel.
+        }.
+        
+        ?PaymentMethod = [?PaymentMethodId ?PaymentMethodLabel].
+    )] collect ?PaymentMethods.
+    
+    system log [ xxxx3 ?PaymentMethods ].
+    // Build payment method header columns
+    [?PaymentMethodHeader (
+        ?PaymentMethods  iter [?PaymentMethodId ?PaymentMethodLabel].
+        ["<th>" ?PaymentMethodLabel "</th>"] sconcat ?PaymentMethodHeader.
+    )] [collect >> sconcat] ?PaymentMethodHeaders.
+    
+    system log [ xxxx4  ?PaymentMethodHeaders ].
+    // Get events for the selected date
+    ?SelectedDate [timeStampToString "%Y-%m-%d 00:00:00"] ?DayStart.
+    ?SelectedDate [+ 86400] ?NextDay.
+    ?NextDay [timeStampToString "%Y-%m-%d 00:00:00"] ?DayEnd.
+    
+    system log [1 xxxx5 ].
+    time secondsPerWeek ?SecondsPerWeek.
+    
+    [?EventRow (
+        ?Txn lmdbQuery { 
+            ?AdminUserId calendar ?CalendarId.
+            ?CalendarId event ?EventId.
+            ?EventId name ?EventName;
+            start ?EventStartTF;
+            frequency ?EventFrequency.
+        }.
+        
+        ?EventStartTF truncate ?EventStartT.
+        system log [xxx ?SecondsPerWeek ?SelectedDate ?NextDay ?EventStartT].
+        // Calculate iterations that fall on selected date
+        clpfd constraint [
+            ?EventStartT + ?Iteration * ?SecondsPerWeek = ?IterationStart 
+            & ?IterationStart in ?SelectedDate ?NextDay
+        ].
+        clpfd label [?Iteration ?IterationStart].
+        
+        ?IterationStart [timeStampToString "%H:%M"] ?IterationStartStr.
+    system log [ xxxx555 ].
+        
+        // Build payment method cells for this event iteration
+        [?PaymentMethodCell (
+            ?PaymentMethods iter [?PaymentMethodId ?PaymentMethodLabel].
+            system log [2 xxxx5 ].
+            // Create deterministic checkin ID
+            [?EventId "_" ?Iteration "_" ?PaymentMethodId] sconcat ?CheckinKey.
+            system log [3 xxxx5 ].
+            ?CheckinKey sha256 ?CheckinIdHash.
+            system log [4 xxxx5 ].
+            ["checkin_" ?CheckinIdHash] sconcat ?CheckinId.
+            system log [5 xxxx5 ].
+            
+            // Get existing checkin amount if any
+            (
+                ?Txn lmdbQuery {
+                    ?CheckinId a CheckIn;
+                    amount ?ExistingAmount.
+                }.
+            ) or (
+                ?ExistingAmount = "0".
+            ).
+    system log [ xxxx6 ].
+            
+            ["checkin_" ?EventId "_" ?Iteration "_" ?PaymentMethodId] sconcat ?FormId.
+            
+            ["<td>
+                <form id='" ?FormId "' method='post' action='/checkin' style='margin: 0;'>
+                    <input type='number' name='amount' value='" ?ExistingAmount "' step='1' min='0' 
+                           style='width: 80px; border: none; text-align: center;'
+                           oninput='debounceSubmit(this.form, 1000);'>
+                    <input type='hidden' name='event' value='" ?EventId "'>
+                    <input type='hidden' name='iteration' value='" ?Iteration "'>
+                    <input type='hidden' name='paymentMethod' value='" ?PaymentMethodId "'>
+                    <input type='hidden' name='date' value='" ?SelectedDateStr "'>
+                </form>
+            </td>"] sconcat ?PaymentMethodCell.
+        )] [collect >> sconcat] ?PaymentMethodCells.
+        
+        ["<tr>
+            <td>" ?EventName " (" ?IterationStartStr ")</td>
+            " ?PaymentMethodCells "
+        </tr>"] sconcat ?EventRow.
+    )] [collect >> sconcat] ?EventRows.
+    
+    ?Txn lmdbEnd [].
+    
+    system log [ xxxx7 ].
+    ["<h1>Check-in for " ?SelectedDateStr "</h1>
+    
+    <script>
+        let debounceTimeouts = {};
+        function debounceSubmit(form, delay = 1000) {
+            const formId = form.id;
+            clearTimeout(debounceTimeouts[formId]);
+            debounceTimeouts[formId] = setTimeout(() => {
+                form.submit();
+            }, delay);
+        }
+    </script>
+    
+    <form method='get' action='/checkin' style='margin-bottom: 1rem;'>
+        <fieldset role='group'>
+            <input type='date' name='date' value='" ?SelectedDateStr "' onchange='this.form.submit();'>
+            <input type='submit' value='Change Date'>
+        </fieldset>
+    </form>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Event</th>
+                " ?PaymentMethodHeaders "
+            </tr>
+        </thead>
+        <tbody>
+            " ?EventRows "
+        </tbody>
+    </table>"] sconcat ?CheckinContent.
+    
+    [?CheckinContent] [buildHTML ?R] ?ResponseHTML.
+) => (
+    ?R response (
+        ?RID status 200;
+        headers ( "Content-Type" = "text/html; charset=utf-8". );
+        body ?ResponseHTML.
+    ).
+).
+
+// Check-in POST handler for upsert
+(
+    ?R match ( 
+        ?RID a post;
+        path "/checkin";
+        body (
+            event = ?EventId.
+            iteration = ?IterationStr.
+            paymentMethod = ?PaymentMethodId.
+            amount = ?AmountStr.
+            date = ?DateStr.
+        );
+        headers ( referer = ?RefererUrl. ).
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?IterationStr parseInteger ?Iteration.
+    ?AmountStr parseInteger ?Amount.
+    
+    // Create deterministic checkin ID
+    [?EventId "_" ?Iteration "_" ?PaymentMethodId] sconcat ?CheckinKey.
+    ?CheckinKey sha256 ?CheckinIdHash.
+    ["checkin_" ?CheckinIdHash] sconcat ?CheckinId.
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Delete existing checkin
+    ?Txn lmdbDelete { ?CheckinId ?P ?O. }.
+    
+    // Insert new checkin
+    ?Txn lmdbInsert { 
+        ?CheckinId a CheckIn;
+        event ?EventId;
+        iteration ?Iteration;
+        paymentMethod ?PaymentMethodId;
+        amount ?Amount.
+    }.
+    
+    ?Txn lmdbEnd [].
+    
+    ["/checkin?date=" ?DateStr] sconcat ?RedirectPath.
+    
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = ?RedirectPath.
+            "Set-Cookie" = "toast=success:Check-in updated successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).

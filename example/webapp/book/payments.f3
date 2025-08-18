@@ -17,19 +17,8 @@
             label ?PaymentMethodLabel.
         }.
         
-        // Count revenue shares for this payment method
-        [?RevShareId (
-            ?Txn lmdbQuery {
-                ?RevShareId a RevenueShare;
-                paymentMethod ?PaymentMethodId.
-            }.
-        )] [collect >> length] ?RevShareCount.
-        
-        [?RevShareCount " revenue shares"] sconcat ?RevSharesText.
-        
         ["<tr>
             <td>" ?PaymentMethodLabel "</td>
-            <td>" ?RevSharesText "</td>
             <td>
                 <a href='/payment-methods/edit/" ?PaymentMethodId "'><button type='button'>Edit</button></a>
                 <form method='post' action='/payment-methods/delete/" ?PaymentMethodId "' style='display: inline; margin-left: 0.5rem;' onsubmit='return confirm(\"Are you sure you want to delete this payment method?\");'>
@@ -56,7 +45,6 @@
         <thead>
             <tr>
                 <th>Label</th>
-                <th>Revenue Shares</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -79,26 +67,20 @@
     ?R match ( 
         ?RID a post;
         path "/payment-methods/create";
-        body ?Body.
+        body (label = ?PaymentMethodLabel.).
     );
     tenantSubdomainString ?Tenant;
     hasRole [Admin ?AdminUserId].
     
-    ?Body match (label = ?PaymentMethodLabel.).
-    
     ?RID sha256 ?RIDHash.
     ["payment_method_" ?RIDHash] sconcat ?PaymentMethodId.
     
-    ?Txn lmdbStartRW "./db".
-    
-    // Create payment method
-    ?Txn lmdbInsert { 
+    ?Txn lmdbStartRW "./db"
+    ; lmdbInsert { 
         ?PaymentMethodId a PaymentMethod;
         label ?PaymentMethodLabel;
         tenantSubdomain ?Tenant.
-    }.
-    
-    ?Txn lmdbEnd [].
+    }; lmdbEnd [].
     
 ) => (
     ?R response (
@@ -483,47 +465,35 @@
     ).
 ).
 
-
 // Revenue Share Edit POST
 (
     ?R match ( 
         ?RID a post;
         path ?Path;
-        body ?Body.
-    );
-    tenantSubdomainString ?Tenant;
-    hasRole [Admin ?AdminUserId].
+        body (event = ?EventId. recipient = ?StaffId. amount = ?Amount.);
+        headers ( referer = ?RefererUrl. ).
+    ); tenantSubdomainString ?Tenant
+    ; hasRole [Admin ?AdminUserId].
     
     ?Path [splitString "/"] ["" "revenue-shares" "edit" ?RevShareId].
-    ?Body match (event = ?EventId. recipient = ?StaffId. amount = ?Amount.).
     
-    ?Txn lmdbStartRW "./db".
-    
-    // Get payment method ID for redirect
-    ?Txn lmdbQuery {
-        ?RevShareId paymentMethod ?PaymentMethodId.
-    }.
-    
-    // Update revenue share
-    ?Txn lmdbDelete { ?RevShareId event ?_OldEvent. }.
-    ?Txn lmdbDelete { ?RevShareId recipient ?_OldRecipient. }.
-    ?Txn lmdbDelete { ?RevShareId amount ?_OldAmount. }.
-    
-    ?Txn lmdbInsert { 
+    ?Txn lmdbStartRW "./db"
+    ; lmdbDelete { 
+        ?RevShareId event ?_OldEvent; 
+        recipient ?_OldRecipient; 
+        amount ?_OldAmount. 
+    }; lmdbInsert { 
         ?RevShareId event ?EventId;
         recipient ?StaffId;
         amount ?Amount.
-    }.
+    }; lmdbEnd [].
     
-    ?Txn lmdbEnd [].
-    
-    ["/payment-methods/edit/" ?PaymentMethodId] sconcat ?RedirectPath.
     
 ) => (
     ?R response (
         ?RID status 302;
         headers ( 
-            "Location" = ?RedirectPath.
+            "Location" = ?RefererUrl.
             "Set-Cookie" = "toast=success:Revenue share updated successfully; Path=/; Max-Age=60".
         ).
     ).
@@ -533,32 +503,24 @@
 (
     ?R match ( 
         ?RID a post;
-        path ?Path.
+        path ?Path;
+        header (referer = ?RefererUrl.).
     );
     tenantSubdomainString ?Tenant;
     hasRole [Admin ?AdminUserId].
     
     ?Path [splitString "/"] ["" "revenue-shares" "delete" ?RevShareId].
     
-    ?Txn lmdbStartRW "./db".
+    ?Txn lmdbStartRW "./db"
+    ; lmdbDelete { ?RevShareId ?P ?O. }
+    ; lmdbEnd [].
     
-    // Get payment method ID for redirect
-    ?Txn lmdbQuery {
-        ?RevShareId paymentMethod ?PaymentMethodId.
-    }.
-    
-    // Delete revenue share
-    ?Txn lmdbDelete { ?RevShareId ?P ?O. }.
-    
-    ?Txn lmdbEnd [].
-    
-    ["/payment-methods/edit/" ?PaymentMethodId] sconcat ?RedirectPath.
     
 ) => (
     ?R response (
         ?RID status 302;
         headers ( 
-            "Location" = ?RedirectPath.
+            "Location" = ?RefererUrl.
             "Set-Cookie" = "toast=success:Revenue share deleted successfully; Path=/; Max-Age=60".
         ).
     ).
