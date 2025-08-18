@@ -187,8 +187,6 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         </select>
         <label for='capacity'>Capacity</label>
         <input type='number' id='capacity' placeholder='Capacity' name='capacity' min='1' required>
-        <label for='paymentmethods'>Payment Methods (comma separated)</label>
-        <input type='text' id='paymentmethods' placeholder='Payment Methods (comma separated)' name='paymentmethods'>
         <label for='finaliteration'>Final Iteration</label>
         <input type='number' id='finaliteration' placeholder='Final Iteration' name='finaliteration' min='1'>
         <label for='openbookings'>Open Bookings Before Start</label>
@@ -210,7 +208,6 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
             duration = ?Duration. 
             frequency = ?Frequency. 
             capacity = ?Capacity.
-            paymentmethods = ?PaymentMethods. 
             finaliteration = ?FinalIteration.
             openbookings = ?OpenBookings. 
         )
@@ -239,7 +236,6 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
         ; duration ?DurationTime
         ; frequency ?Frequency
         ; capacity ?Capacity
-        ; paymentMethods ?PaymentMethods
         ; finalIteration ?FinalIteration
         ; openBookingsXSecondsBeforeStart ?OpenBookingsTime. 
     }

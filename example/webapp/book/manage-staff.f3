@@ -9,11 +9,11 @@
     
     ?Txn lmdbStartR "./db".
     
-    // Get all staff members for this tenant
+    // Get all staff members for this admin user
     [?StaffRow (
         ?Txn lmdbQuery { 
+            ?AdminUserId staff ?StaffId.
             ?StaffId a Staff;
-            tenantSubdomain ?Tenant;
             email ?StaffEmail.
         }.
         system log [xxxxxxxxaaaaaaaaaa staff member is ?StaffId with email ?StaffEmail].
@@ -79,13 +79,13 @@
     
     ?Txn lmdbStartR "./db".
     
-    // Get all events for this tenant to show as checkboxes
+    // Get all events for this admin user to show as checkboxes
     [?EventCheckbox (
         ?Txn lmdbQuery { 
+            ?AdminUserId calendar ?CalendarId.
             ?CalendarId name ?CalendarName;
             event ?EventId.
             ?EventId name ?EventName.
-            ?CalendarId tenantSubdomain ?Tenant.
         }.
         
         ["<label>
@@ -140,8 +140,10 @@
     // Create staff member
     ?Txn lmdbInsert { 
         ?StaffId a Staff;
-        email ?StaffEmail;
-        tenantSubdomain ?Tenant.
+        email ?StaffEmail.
+    }.
+    ?Txn lmdbInsert {
+        ?AdminUserId staff ?StaffId.
     }.
     
     // Associate with selected events
@@ -179,9 +181,9 @@
     
     // Get staff details
     ?Txn lmdbQuery { 
+        ?AdminUserId staff ?StaffId.
         ?StaffId a Staff;
-        email ?StaffEmail;
-        tenantSubdomain ?Tenant.
+        email ?StaffEmail.
     }.
     
     // Get all events for this tenant to show as checkboxes
@@ -246,9 +248,9 @@
     hasRole [Admin ?AdminUserId].
     
     ?Body toString ?BodyString.
-    system log [xxxxxxxxaaaaaaaaaa editing staff member ?Body].
 
     ?Path [splitString "/"] ["" "staff" "edit" ?StaffId].
+    system log [xxxxxxxxaaaaaaaaaa editing staff member ?Body].
     ?Body match (email = ?StaffEmail.).
     
     ?Txn lmdbStartRW "./db".
@@ -318,9 +320,10 @@
     ?R subdomain ?Subdomain; [f3AuthSession >> match ] ( sub = ?UserId. email = ?UserEmail. ).
     ?txn lmdbStartR "./db"; 
     lmdbQuery { 
+        ?TenantUserId tenantSubdomain ?Subdomain.
+        ?TenantUserId staff ?StaffId.
         ?StaffId a Staff;
-        email ?UserEmail;
-        tenantSubdomain ?Subdomain.
+        email ?UserEmail.
     }; 
     lmdbEnd [].
     system cut [].

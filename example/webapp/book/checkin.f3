@@ -22,16 +22,27 @@
     system log [ xxxx2 ?SelectedDateStr ].
     ?Txn lmdbStartR "./db".
     
-    // Get all payment methods for this tenant
+    // Get all payment methods for this admin user
     [?PaymentMethod (
         ?Txn lmdbQuery { 
+            ?AdminUserId paymentMethod ?PaymentMethodId.
             ?PaymentMethodId a PaymentMethod;
-            tenantSubdomain ?Tenant;
             label ?PaymentMethodLabel.
         }.
         
         ?PaymentMethod = [?PaymentMethodId ?PaymentMethodLabel].
     )] collect ?PaymentMethods.
+    
+    // Get all staff members for this admin user
+    [?StaffMember (
+        ?Txn lmdbQuery { 
+            ?AdminUserId staff ?StaffId.
+            ?StaffId a Staff;
+            email ?StaffEmail.
+        }.
+        
+        ?StaffMember = [?StaffId ?StaffEmail].
+    )] collect ?StaffMembers.
     
     system log [ xxxx3 ?PaymentMethods ].
     // Build payment method header columns
@@ -108,9 +119,53 @@
             </td>"] sconcat ?PaymentMethodCell.
         )] [collect >> sconcat] ?PaymentMethodCells.
         
+        // Build staff dropdown for this event row
+        // Create deterministic staff checkin ID
+        [?EventId "_" ?Iteration] sconcat ?StaffCheckInKey.
+        ?StaffCheckInKey sha256 ?StaffCheckInHash.
+        ["staff_checkin_" ?StaffCheckInHash] sconcat ?StaffCheckInId.
+        
+        // Get current staff assignment
+        (
+            ?Txn lmdbQuery {
+                ?StaffCheckInId a StaffCheckIn;
+                staff ?CurrentStaffId.
+            }.
+        ) or (
+            ?CurrentStaffId = "".
+        ).
+        
+        [?StaffRowOption (
+            ?StaffMembers iter [?StaffId ?StaffEmail].
+            
+            (
+                ?StaffId = ?CurrentStaffId.
+                ?Selected = "selected".
+            ) or (
+                ?Selected = "".
+            ).
+            
+            ["<option value='" ?StaffId "' " ?Selected ">" ?StaffEmail "</option>"] sconcat ?StaffRowOption.
+        )] [collect >> sconcat] ?StaffRowOptions.
+        
+        ["staff_form_" ?EventId "_" ?Iteration] sconcat ?StaffFormId.
+        
+        ["<td>
+            <form id='" ?StaffFormId "' method='post' action='/checkin-staff' style='margin: 0;'>
+                <select name='staff' onchange='debounceSubmit(this.form, 1000);' style='width: 120px;'>
+                    <option value=''>No staff</option>
+                    " ?StaffRowOptions "
+                </select>
+                <input type='hidden' name='event' value='" ?EventId "'>
+                <input type='hidden' name='iteration' value='" ?Iteration "'>
+                <input type='hidden' name='date' value='" ?SelectedDateStr "'>
+            </form>
+        </td>"] sconcat ?StaffCell.
+        
         ["<tr>
             <td>" ?EventName " (" ?IterationStartStr ")</td>
             " ?PaymentMethodCells "
+            " ?StaffCell "
         </tr>"] sconcat ?EventRow.
     )] [collect >> sconcat] ?EventRows.
     
@@ -142,6 +197,7 @@
             <tr>
                 <th>Event</th>
                 " ?PaymentMethodHeaders "
+                <th>Staff</th>
             </tr>
         </thead>
         <tbody>
@@ -207,6 +263,56 @@
         headers ( 
             "Location" = ?RedirectPath.
             "Set-Cookie" = "toast=success:Check-in updated successfully; Path=/; Max-Age=60".
+        ).
+    ).
+).
+
+// Staff Check-in POST handler 
+(
+    ?R match ( 
+        ?RID a post;
+        path "/checkin-staff";
+        body (
+            event = ?EventId.
+            iteration = ?IterationStr.
+            staff = ?StaffId.
+            date = ?DateStr.
+        );
+        headers ( referer = ?RefererUrl. ).
+    );
+    tenantSubdomainString ?Tenant;
+    hasRole [Admin ?AdminUserId].
+    
+    ?IterationStr parseInteger ?Iteration.
+    
+    // Create deterministic staff checkin ID
+    [?EventId "_" ?Iteration] sconcat ?StaffCheckInKey.
+    ?StaffCheckInKey sha256 ?StaffCheckInHash.
+    ["staff_checkin_" ?StaffCheckInHash] sconcat ?StaffCheckInId.
+    
+    ?Txn lmdbStartRW "./db".
+    
+    // Delete existing staff checkin
+    ?Txn lmdbDelete { ?StaffCheckInId ?P ?O. }.
+    
+    // Insert new staff checkin
+    ?Txn lmdbInsert { 
+        ?StaffCheckInId a StaffCheckIn;
+        event ?EventId;
+        iteration ?Iteration;
+        staff ?StaffId.
+    }.
+    
+    ?Txn lmdbEnd [].
+    
+    ["/checkin?date=" ?DateStr] sconcat ?RedirectPath.
+    
+) => (
+    ?R response (
+        ?RID status 302;
+        headers ( 
+            "Location" = ?RedirectPath.
+            "Set-Cookie" = "toast=success:Staff assignment updated successfully; Path=/; Max-Age=60".
         ).
     ).
 ).
