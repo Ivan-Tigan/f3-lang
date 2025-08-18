@@ -506,20 +506,15 @@
 
 // Revenue Share Delete POST
 (
-    system log [deleeeeteeeee ?R ].
     ?R match ( 
         ?RID a post;
         path ?Path;
         headers (referer = ?RefererUrl.).
     ).
-    system log [deleeeeteeeee 1 ?Path ].
     ?R tenantSubdomainString ?Tenant.
-    system log [deleeeeteeeee 2 ?Path ].
     ?R hasRole [Admin ?AdminUserId].
-    system log [deleeeeteeeee ?Path ].
     
     ?Path [splitString "/"] ["" "revenue-shares" "delete" ?RevShareId].
-    system log [deleeeeteeeee ?Path ?RevShareId].
     ?Txn lmdbStartRW "./db"
     ; lmdbDelete { ?RevShareId ?P ?O. }
     ; lmdbEnd [].

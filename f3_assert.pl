@@ -97,6 +97,8 @@ minby_helper([X|XS], Pred, Acc, Smallest) :-
 
 p(system, log, X) :- node_string(X, S),!, format(user_error, "~w~n", [S]).
 p(system, log, X) :- format(user_error, "~q~n", [X]), !.
+p(X, nodeHash, Hash) :- 
+   term_hash(X, Hash).
 
 p(X, toString, S) :- node_string(X, S).
 p(S, parseInteger, I) :- 
@@ -118,6 +120,7 @@ p(graph(G1), or, graph(G2)) :-
     (Conjunction1 -> true; Conjunction2).
 
 p(XS, sconcat, Res) :- atomics_to_string(XS, Res) .
+p(XS, [sconcat, Sep], Res) :- atomics_to_string(XS, Sep, Res) .
 p(S, [splitString, Separator], Res) :- 
    atom_string(S, SStr),
    % format(user_error, "ZZZZZZZZZZZZZZZZZZZZ Splitting string: ~q with separator: ~q~n", [SStr, Separator]),
