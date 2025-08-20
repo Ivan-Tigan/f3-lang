@@ -242,6 +242,17 @@
     
     ["<h1>Edit Payment Method</h1>
     
+    <script>
+        let debounceTimeouts = {};
+        function debounceSubmit(form, delay = 1000) {
+            const formId = form.id;
+            clearTimeout(debounceTimeouts[formId]);
+            debounceTimeouts[formId] = setTimeout(() => {
+                form.submit();
+            }, delay);
+        }
+    </script>
+    
     <form action='/payment-methods/edit/" ?PaymentMethodId "' method='post'>
         <fieldset role='group'>
             <input type='text' name='label' value='" ?PaymentMethodLabel "' required>
@@ -401,8 +412,10 @@
     hasRole [Admin ?AdminUserId].
     
     ?Path [splitString "/"] ["" "payment-methods" ?PaymentMethodId "revenue-shares" "create"].
-    ?Body match (event = ?EventId. recipient = ?StaffId. amount = ?StaffAmount. adminAmount = ?AdminAmount. validSince = ?ValidSinceStr. validUntil = ?ValidUntilStr.).
-    
+    ?Body match (event = ?EventId. recipient = ?StaffId. amount = ?StaffAmountS. adminAmount = ?AdminAmountS. validSince = ?ValidSinceStr. validUntil = ?ValidUntilStr.).
+    ?StaffAmountS parseInteger ?StaffAmount.
+    ?AdminAmountS parseInteger ?AdminAmount.
+
     ?RID sha256 ?RIDHash.
     ["revenue_share_" ?RIDHash] sconcat ?RevShareId.
     
@@ -454,13 +467,14 @@
     ?R match ( 
         ?RID a post;
         path ?Path;
-        body (event = ?EventId. recipient = ?StaffId. amount = ?StaffAmount. adminAmount = ?AdminAmount. validSince = ?ValidSinceStr. validUntil = ?ValidUntilStr.);
+        body (event = ?EventId. recipient = ?StaffId. amount = ?StaffAmountS. adminAmount = ?AdminAmountS. validSince = ?ValidSinceStr. validUntil = ?ValidUntilStr.);
         headers ( referer = ?RefererUrl. ).
     ); tenantSubdomainString ?Tenant
     ; hasRole [Admin ?AdminUserId].
     
     ?Path [splitString "/"] ["" "revenue-shares" "edit" ?RevShareId].
-    
+    ?StaffAmountS parseInteger ?StaffAmount.
+    ?AdminAmountS parseInteger ?AdminAmount.
     // Parse dates
     (
         ?ValidSinceStr neq "".

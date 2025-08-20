@@ -1,4 +1,6 @@
 system include "./roles.f3", "payments.f3", "./f3auth.f3", "./time.f3", "./events-table.f3", "./set-main-calendar.f3", "./set-tenant-subdomain.f3", "./create-calendar.f3", "./toast.f3", "./navbar.f3", "./my-bookings.f3", "./manage-staff.f3", "./checkin.f3", "./analytics.f3".
+
+
 f3Auth encryptionSecretKey "Some secret key";
     clientId "0xdrjgnfvjdpn7wfgs1z2";
     clientSecret "CDlhWVPjoX0K6yZe9BDuajrRgEsbZ3DI";
@@ -8,6 +10,8 @@ f3Auth encryptionSecretKey "Some secret key";
     appDomain "localhost";
     loginRedirect "/";
     logoutRedirect "/".
+
+
 (
     f3Auth logoutPath ?LogoutPath.
     ?R [f3AuthSession >> match] (name = ?UserName.).

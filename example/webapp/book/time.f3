@@ -95,6 +95,25 @@ time secondsPerMinute 60.
     ?Day1  = ?Day2.
 ) => ( [?Timestamp1 ?Timestamp2] sameDay []. ).
 
+(
+    ?Timestamp [timeStampToString "%d-%m-%Y"] ?S.
+    ?S [splitString "-"] [?Day ?Month ?Year].
+    [?Year "-" ?Month "-01"] sconcat ?NewDate.
+    system log [new date ?NewDate].
+    ?NewDate [parseTimeStamp >> truncate] ?MonthStart.
+
+) => (
+    ?Timestamp monthStart ?MonthStart.
+).
+
+(
+    ?Timestamp monthStart ?MonthStart.
+    [?MonthStart 40] addDays ?NextMonth.
+    ?NextMonth monthStart ?NextMonthStart.
+
+) => (
+    ?Timestamp nextMonthStart ?NextMonthStart.
+).
 // Format weekday name (Monday = 0)
 0 weekdayName "Monday".
 1 weekdayName "Tuesday".
@@ -104,11 +123,11 @@ time secondsPerMinute 60.
 5 weekdayName "Saturday".
 6 weekdayName "Sunday".
 
-
 // system query [[1 ?X] ( system [now >> weekday >> weekdayName] ?X.)].
 // system query [[2 ?X] ( system [now >> dayStart >> [timeStampToString "%a, %d %b %Y %T GMT"]] ?X.)].
 // system query [[3 ?X] ( "2006-12-08T17:29:44+02:00" [parseTimeStamp >> [timeStampToString "%a, %d %b %Y %T GMT"]] ?X.)].
 // system query [[4 ?X] ( system now ?Now. [?Now 3] [addDays >> weekday >> weekdayName] ?X.)].
-// system query [[5 ?X] ( system now ?Now. ?Now [weekStart >> weekday >> weekdayName] ?X.)].
+system query [[5 ?X] ( system now ?Now. ?Now [monthStart >> [timeStampToString "%d-%m-%Y"]] ?X.)].
+system query [[6 ?X] ( system now ?Now. ?Now [nextMonthStart >> [timeStampToString "%d-%m-%Y"]] ?X.)].
 
 // system query [[6 ?X] ( "13:00" [parseTime >> [timeStampToString "%T"]] ?X.)].

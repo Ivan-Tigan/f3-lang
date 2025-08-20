@@ -40,7 +40,6 @@
         & ?DayIterationTimeStamp in ?WeekStart ?WeekEnd
     ].
         system log ["TTTTTTTTTTTTTTT 4: " ?CalendarId].
-        //todo failed
     ?Txn2 lmdbStartR "./db".
     [?DayColumn (
         clpfd label [?DayIterationTimeStamp].

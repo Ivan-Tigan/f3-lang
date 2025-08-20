@@ -1,3 +1,4 @@
+
 // Staff Analytics Page
 (
     ?R match ( 
@@ -6,192 +7,142 @@
     );
     tenantSubdomainString ?Tenant;
     hasRole [Admin ?AdminUserId].
-    system log [TTTTTTTTTTTTTTT Analytics Page 1].
     ?Path [splitString "/"] ["" "analytics" "staff" ?StaffId].
     
-    // Get date parameters or use defaults (last 30 days)
     system [now >> dayStart] ?Today.
-    ?Today [- 2592000] ?DefaultStartDate. // 30 days ago
     
-    system log [TTTTTTTTTTTTTTT Analytics Page 2].
     (
         ?R match (?RID params ( startDate = ?StartDateStr. ).).
         ?StartDateStr [parseTimeStamp >> truncate] ?StartDate.
     ) or (
-        ?StartDate = ?DefaultStartDate.
+        ?Today monthStart ?StartDate.
     ).
     
-    system log [TTTTTTTTTTTTTTT Analytics Page 3].
     (
         ?R match (?RID params ( endDate = ?EndDateStr. ).).
         ?EndDateStr [parseTimeStamp >> truncate] ?EndDate.
     ) or (
-        ?EndDate = ?Today.
+        ?Today nextMonthStart ?EndDate.
     ).
-    system log [TTTTTTTTTTTTTTT Analytics Page 4].
     
     ?StartDate [timeStampToString "%Y-%m-%d"] ?StartDateStr.
     ?EndDate [timeStampToString "%Y-%m-%d"] ?EndDateStr.
     
-    system log [TTTTTTTTTTTTTTT Analytics Page 5].
     ?Txn lmdbStartR "./db".
     
-    // Get staff member info
-    ?Txn lmdbQuery { 
-        ?AdminUserId staff ?StaffId.
-        ?StaffId a Staff;
-        email ?StaffEmail.
-    }.
+    ?Txn lmdbQuery { ?AdminUserId staff ?StaffId.  ?StaffId a Staff; email ?StaffEmail.  }.
     
-    // Get all payment methods for labels
-    [?PaymentMethodData (
+    // Get all events for labels
+    [[?EventId ?EventName] (
         ?Txn lmdbQuery { 
-            ?AdminUserId paymentMethod ?PaymentMethodId.
-            ?PaymentMethodId a PaymentMethod;
-            label ?PaymentMethodLabel.
+            ?AdminUserId calendar ?CalendarId.
+            ?CalendarId event ?EventId.
+            ?EventId name ?EventName.
         }.
-        
-        ?PaymentMethodData = [?PaymentMethodId ?PaymentMethodLabel].
-    )] collect ?PaymentMethods.
+    )] collect ?Events.
     
-    system log [TTTTTTTTTTTTTTT Analytics Page 6].
-    // Get revenue share rules for this staff member
-    [?RevenueShareRule (
-        ?Txn lmdbQuery {
-            ?RevShareId a RevenueShare;
-            recipient ?StaffId;
-            event ?EventId;
-            paymentMethod ?PaymentMethodId;
-            staffAmount ?StaffAmount;
-            adminAmount ?AdminAmount;
-            validSince ?ValidSince;
-            validUntil ?ValidUntil.
-        }.
         
-        ?RevenueShareRule = [?RevShareId ?EventId ?PaymentMethodId ?StaffAmount ?AdminAmount ?ValidSince ?ValidUntil].
-    )] collect ?RevenueShareRules.
     
-    system log [TTTTTTTTTTTTTTT Analytics Page 7 ?StartDate ?EndDate].
     time secondsPerDay ?SecondsPerDay.
     ?StartDate [/ ?SecondsPerDay] ?StartDays.
     ?EndDate [/ ?SecondsPerDay] ?EndDays.
     ?EndDays [- ?StartDays] ?TotalDays.
     // Calculate daily revenue data
-    [?DayData (
+    [[?DateStr ?EventRevenues ?DayTotal] (
         // Generate each day in the range
-        clpfd constraint [
-            ?DayOffset in 0 ?TotalDays
-        ]; label [?DayOffset ].
+        clpfd constraint [ ?DayOffset in 0 ?TotalDays ]; label [?DayOffset ].
         [?StartDate ?DayOffset] addDays ?CurrentDate.
-        
         ?CurrentDate [timeStampToString "%Y-%m-%d"] ?DateStr.
-        
-    system log [TTTTTTTTTTTTTTT Analytics Page 8].
-        // Calculate total revenue for this day by payment method
-        [?PaymentMethodRevenue (
-            ?PaymentMethods iter [?PaymentMethodId ?PaymentMethodLabel].
+        // Calculate total revenue for this day by event/class
+        [[[?EventId ?EventName] ?TotalEventRevenue] (
+            ?Events iter [?EventId ?EventName].
             
-            // Sum all revenue for this payment method on this day
-            [?CheckinRevenue (
-                // Find checkins that happened on this date
+            // Sum all revenue for this specific event ID on this day
+            [?StaffRevenue (
+                // Find checkins that happened on this date for this specific event
                 ?Txn lmdbQuery {
                     ?CheckinId a CheckIn;
                     event ?EventId;
                     iteration ?Iteration;
                     paymentMethod ?PaymentMethodId;
                     amount ?CheckinAmount.
-                }.
-                
-                // Get event start time to calculate checkin date
-                ?Txn lmdbQuery {
+                    
                     ?EventId start ?EventStartT.
+                    
+                    ?RevShareId a RevenueShare;
+                    recipient ?StaffId;
+                    event ?EventId;
+                    paymentMethod ?PaymentMethodId;
+                    staffAmount ?StaffAmount;
+                    adminAmount ?AdminAmount;
+                    validSince ?ValidSince;
+                    validUntil ?ValidUntil.
                 }.
                 
-                // Calculate actual checkin date
-                time secondsPerWeek ?SecondsPerWeek.
-                ?Iteration [* ?SecondsPerWeek] ?IterationSecondsOffset.
-                ?EventStartT [+ ?IterationSecondsOffset] ?CheckinDateTime.
-                ?CheckinDateTime dayStart ?CheckinDate.
+                time [secondsPerWeek >> [* ?Iteration] >> [+ ?EventStartT] >> dayStart] ?CurrentDate.
                 
-                // Only include checkins from current date
-                ?CheckinDate = ?CurrentDate.
-                
-                // Find matching revenue share rule
-                ?RevenueShareRules iter [?RevShareId ?EventId ?PaymentMethodId ?StaffAmount ?AdminAmount ?ValidSince ?ValidUntil].
-                
-                // Check if checkin date is within revenue share validity
-                ?CheckinDate >= ?ValidSince.
-                (
-                    ?ValidUntil = now.
-                ) or (
-                    ?CheckinDate =< ?ValidUntil.
-                ).
-                
-    system log [TTTTTTTTTTTTTTT Analytics Page 9 ?CheckinDate ?StaffAmount].
-                // Calculate revenue for this checkin
-                ?CheckinRevenue = ?StaffAmount.
-            )] [collect >> sum] ?TotalMethodRevenue.
+                ?CurrentDate >= ?ValidSince.
+                ( ?ValidUntil = now.) or ( ?CurrentDate =< ?ValidUntil.).
+                ?CheckinAmount [* ?StaffAmount] ?StaffRevenue.
+            )] [collect >> sum] ?TotalEventRevenue.
             
-            ?PaymentMethodRevenue = [?PaymentMethodLabel ?TotalMethodRevenue].
-        )] collect ?MethodRevenues.
+            
+        )] collect ?EventRevenues.
         
-    system log [TTTTTTTTTTTTTTT Analytics Page 10 ?DateStr ?MethodRevenues].
         // Calculate total for the day
-        [?DayTotal (
-            ?MethodRevenues iter [?Label ?Amount].
-            ?DayTotal = ?Amount.
+        [?Amount (
+            ?EventRevenues iter [?EventKey ?Amount].
         )] [collect >> sum] ?DayTotal.
         
-        ?DayData = [?DateStr ?MethodRevenues ?DayTotal].
-    system log [TTTTTTTTTTTTTTT 1 Analytics Page 10 ?DayData].
     )] collect ?ChartData.
     
     ?Txn lmdbEnd [].
     
-    system log [TTTTTTTTTTTTTTT 2 Analytics Page 10].
-    // Format data for Chart.js
-    [?DateLabel (
-        ?ChartData iter [?DateStr ?MethodRevenues ?DayTotal].
-        ["\"" ?DateStr "\""] sconcat ?DateLabel.
-    )] [collect >> [sconcat ","]] ?DateLabels.
+    [?DateStr (
+        ?ChartData iter [?DateStr ?EventRevenues ?DayTotal].
+    )] [collect >> jsonToString] ?DateLabels.
     
-    system log [TTTTTTTTTTTTTTT Analytics Page 11].
-    // Build datasets for each payment method
-    [?PaymentMethodDataset (
-        ?PaymentMethods iter [?PaymentMethodId ?PaymentMethodLabel].
+    [(
+            label = ?EventName.
+            data = ?DataPoints.
+            borderColor = ?BorderColor.
+            backgroundColor = ?BackgroundColor.
+            tension = 0.1.
+    ) (
+        ?Events iter [?EventId ?EventName].
         
         [?DayAmount (
-            ?ChartData iter [?DateStr ?MethodRevenues ?DayTotal].
+            ?ChartData iter [?DateStr ?EventRevenues ?DayTotal].
             
-            // Find amount for this payment method on this day
+            // Find amount for this event on this day
             (
-                ?MethodRevenues iter [?PaymentMethodLabel ?Amount].
+                ?EventRevenues iter [[?EventId ?EventName] ?Amount].
                 ?DayAmount = ?Amount.
             ) or (
                 ?DayAmount = 0.
             ).
-        )] [collect >> [sconcat ","]] ?DataPoints.
+        )] collect ?DataPoints.
         
-        // Generate random color for this payment method
-        ?PaymentMethodId nodeHash ?ColorHash.
-        ?ColorHash [mod 360] ?Hue.
-        
-        ["{
-            label: \"" ?PaymentMethodLabel "\",
-            data: [" ?DataPoints "],
-            borderColor: \"hsl(" ?Hue ", 70%, 50%)\",
-            backgroundColor: \"hsla(" ?Hue ", 70%, 50%, 0.1)\",
-            tension: 0.1
-        }"] sconcat ?PaymentMethodDataset.
-    )] [collect >> [sconcat ","]] ?PaymentMethodDatasets.
+        // Generate random color for this event
+        ?EventId [nodeHash >> [mod 360]] ?Hue.
+
+        ["hsl(" ?Hue ", 70%, 50%)"] sconcat ?BorderColor.
+        ["hsla(" ?Hue ", 70%, 50%, 0.1)"] sconcat ?BackgroundColor.
+    )] collect ?EventDatasets.
     
     system log [TTTTTTTTTTTTTTT Analytics Page 12].
     // Build total dataset
-    [?TotalAmount (
-        ?ChartData iter [?DateStr ?MethodRevenues ?DayTotal].
-        ?TotalAmount = ?DayTotal.
-    )] [collect >> [sconcat ","]] ?TotalDataPoints.
+    ?ChartData  [map [2]] ?TotalDataPoints.
     
+    [?EventDatasets [(
+        label = "Total".
+        data = ?TotalDataPoints.
+        borderColor = "#000000".
+        backgroundColor = "rgba(0, 0, 0, 0.1)".
+        borderWidth = 3.
+        tension = 0.1.
+    )]] [lconcat >> jsonToString] ?AllDatasets.
+
     ["<h1>Analytics for " ?StaffEmail "</h1>
     
     <form method='get' style='margin-bottom: 2rem;'>
@@ -212,18 +163,10 @@
         const chart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: [" ?DateLabels "],
-                datasets: [
-                    " ?PaymentMethodDatasets ",
-                    {
-                        label: 'Total',
-                        data: [" ?TotalDataPoints "],
-                        borderColor: '#000000',
-                        backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.1
-                    }
-                ]
+                labels: " ?DateLabels ",
+                datasets: 
+                    " ?AllDatasets ",
+                    
             },
             options: {
                 responsive: true,
@@ -246,7 +189,7 @@
                 plugins: {
                     title: {
                         display: true,
-                        text: 'Daily Revenue Breakdown'
+                        text: 'Daily Revenue Breakdown by Class'
                     },
                     legend: {
                         display: true,
