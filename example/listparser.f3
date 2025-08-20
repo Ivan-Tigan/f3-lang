@@ -19,6 +19,11 @@
 //     ) return ?r].
 (?a ?f1 ?r1. ?a ?f2 ?r2.) => (?a [fanout ?f1 ?f2] [?r1 ?r2].).
 
+10 [fanout [+ 5] [* 2]] [15 20].
+
+
+    2 [fun ?input -> ( ?input [+ 1] ?output.) return ?output] 3.
+
 ( ?x ?f ?y.) => ( [?x] [map ?f] [?y].).
 (
     ?xs head ?x. ?xs tail ?rest.
@@ -40,7 +45,13 @@
 ).
 
 
-0 fib 0. 1 fib 1. fib <- [[fanout [- 1] [- 2]] >> [map [k cache fib]] >> sum].
+0 fib 0. 
+1 fib 1. 
+fib <- [
+    [fanout [- 1] [- 2]] 
+    >> [map [k cache fib]] 
+    >> sum
+].
 
 
 

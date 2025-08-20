@@ -4,6 +4,18 @@
 ?x a:(?x <- ?y. ?y a ?A.) ?A.
 
 
+
+(
+    import crypto ?libraryPrefix.
+) => ( 
+    ( ?input [+ 1] ?output.) => (?input ?libraryPrefix:encrypt ?output.).
+    ( ?input [- 1] ?output.) => (?input ?libraryPrefix:decrypt ?output.).
+).
+
+
+        import crypto mylib1, mylib2c.
+
+
 ?Timestamp 
     weekStart:(
         ?Timestamp weekday ?Weekday.
@@ -46,14 +58,26 @@ z <- [[Cons x] Nil].
 ?x:?xs sumChain:( ?xs sumChain ?sum. ?x [+ ?sum] ?res.) ?res.
 ?x:?y a:( ?x a ?TX. ?y a ?TY.) ?TX:?TY.
 ?x:?xs a:( ?x a ?TX. ?xs a ?TXs.) ?TX:?TXs.
+
+f1 a string.
+f1 <- "asd".
+( 
+    ?X <- ?V. 
+    ?X a ?Type.
+    system not { ?Type = atom. ?V a ?Type.}. 
+) => (
+    system staticError [Expected  ?Type ?X ?V].
+).
+
 // system debug listing.
-system query [[?res4 ?res6 ?t] (
+system query [?output (
     // x a ?res1.
     // y a ?res2.
-    // z a ?res3.
+    3 [mylib1:encrypt >> mylib2:decrypt] ?output.
+    // z a ?type.
     // system trace [].
-    ( x = 5. y = 7.) res ?res4.
-    3:5:7 sumChain ?res6.
-    "abc":3:hello a ?t.
+    // ( x = 5. y = 7.) res ?res4.
+    // 3:5:7 sumChain ?res6.
+    // "abc":3:hello a ?t.
 )].
 

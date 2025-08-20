@@ -19,6 +19,15 @@ import mod1 mod1; mod2 othermod.
 use mod othermod.
 
 query is sql:["select * from " table " where size > " 30].
+a b 1:[?X 3:cm]:3.
+
+
+(
+    4 [* 5] 20.
+) => (
+    ?A [?Pred1 >> ?Pred2] ?C.
+).
+
 
 (
     ?x [/ ?y] ?z.

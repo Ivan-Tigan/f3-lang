@@ -1,6 +1,5 @@
 (
     ?R match ( ?RID a get; path ?Path. ).
-   
    system log xxxxxxxxxxxxxxxx1.
     ?Txn lmdbStartR "./db".
    system log xxxxxxxxxxxxxxx2.
@@ -24,25 +23,44 @@
     ).
     ?Txn lmdbQuery { ?CalendarId name ?CalendarName. }
     ; lmdbEnd [].
-    system sleep 1.
     system cut [].
         system log ["TTTTTTTTTTTTTTT 1: " ?CalendarId].
-    system [now >> weekStart] ?WeekStart.
+    
+    // Get page parameter or use 0 for current week
+    (
+        ?R match (?RID params ( page = ?PageStr. ). ).
+        ?PageStr parseInteger ?Page.
+    ) or (
+        ?Page = 0.
+    ).
+    
+    
+    // Calculate week offset based on page parameter
+    system [now >> weekStart] ?CurrentWeekStart.
+    time secondsPerWeek ?SecondsPerWeek.
+    ?Page [[* ?SecondsPerWeek] >> [+ ?CurrentWeekStart]] ?WeekStart.
+    
     ?WeekStart [timeStampToString "%a, %d %b %Y %T GMT"] ?WeekStartStr.
 
         system log ["TTTTTTTTTTTTTTT 2: " ?CalendarId].
-    [?WeekStart 7] addDays ?WeekEnd.
+    [?WeekStart 6] addDays ?WeekEnd.
     ?WeekEnd [timeStampToString "%a, %d %b %Y %T GMT"] ?WeekEndStr.
         system log ["TTTTTTTTTTTTTTT 3: " ?CalendarId].
+    // Calculate unified range from WeekStart to Today+7
+    system [now >> dayStart] ?CurrentToday.
+    ?Page [[* ?SecondsPerWeek] >> [+ ?CurrentToday]] ?Today.
+    [?Today 6] addDays ?VerticalEnd.
+    
     time secondsPerDay ?SecondsPerDay; secondsPerWeek ?SecondsPerWeek.
     clpfd constraint [
         ?WeekStart + ?DayIteration * ?SecondsPerDay  = ?DayIterationTimeStamp
-        & ?DayIterationTimeStamp in ?WeekStart ?WeekEnd
+        & ?DayIterationTimeStamp in ?WeekStart ?VerticalEnd
     ].
         system log ["TTTTTTTTTTTTTTT 4: " ?CalendarId].
     ?Txn2 lmdbStartR "./db".
     [?DayColumn (
         clpfd label [?DayIterationTimeStamp].
+        ?DayIterationTimeStamp =< ?WeekEnd.
         ?DayIterationTimeStamp [timeStampToString "%a, %d %b %Y"] ?DayColumnHeaderTimestamp.
     
         [?EventRow (
@@ -107,23 +125,183 @@
         )] [collect >> sconcat] ?EventRows.
         ["<div><div>" ?DayColumnHeaderTimestamp "</div><div>" ?EventRows "</div></div>"] sconcat ?DayColumn.
     )] [collect >> sconcat] ?DayColumns.
+    
+    // Build vertical view (today onwards with accordions) - reuse day iterations
+    [?VerticalDayAccordion (
+        clpfd label [?DayIterationTimeStamp].
+        ?DayIterationTimeStamp >= ?Today.
+        ?DayIterationTimeStamp [timeStampToString "%a, %d %b %Y"] ?DayColumnHeaderTimestamp.
+    
+        [?EventRow (
+            ?Txn2 lmdbQuery { 
+                ?CalendarId event ?EventId. 
+                ?EventId name ?EventName
+                ; start ?EventStartTF
+                ; frequency ?EventFrequency
+                ; duration ?DurationT
+                ; capacity ?Capacity. 
+            }.
+            ?EventStartTF truncate ?EventStartT.
+            ?EventStartT [timeStampToString "%a, %d %b %Y %T GMT"] ?EventStart.
+            ?DurationT [timeStampToString "%H:%M"] ?Duration.
+            clpfd constraint [
+                ?EventStartT + ?Iteration * ?SecondsPerWeek = ?IterationTimeStamp
+                & ?IterationTimeStamp >= ?Today
+                & ?IterationTimeStamp <= ?VerticalEnd
+            ].
+            clpfd label [?Iteration ?IterationTimeStamp].
+            ?IterationTimeStamp dayStart ?DayIterationTimeStamp; [timeStampToString "%H:%m"] ?IterationTimeStampStr.
+            ?IterationTimeStamp [+ ?DurationT] ?EventEndT.
+            ?EventEndT [timeStampToString "%H:%m"] ?EventEnd.
+            [?Booking (
+                ?Txn2 lmdbQuery { 
+                    ?Booking a Booking
+                    ; event ?EventId
+                    ; iteration ?Iteration. 
+                }.
+                system not {
+                    ?Txn2 lmdbQuery { ?Booking cancelled ?CancelledTime. }.
+                }.
+            )] [collect >> length] ?Bookings.
+
+            // Role-based actions: Admin gets all, Staff gets book+bookings for their events, others get book only
+            (
+                ?R hasRole [Admin ?UserId].
+                ["<a href='/event/" ?EventId "/" ?Iteration "/book'>Book</a>
+                    <a href='/event/" ?EventId "/" ?Iteration "/bookings'>Bookings</a>
+                    <a href='/event/" ?EventId "/" ?Iteration "/edit'>Edit</a>"] sconcat ?ActionsHTML.
+            ) or ((
+                ?R hasRole [Staff ?UserId ?StaffId]; canAccessEvent ?EventId.
+                ["<a href='/event/" ?EventId "/" ?Iteration "/book'>Book</a>
+                    <a href='/event/" ?EventId "/" ?Iteration "/bookings'>Bookings</a>"] sconcat ?ActionsHTML.
+            ) or (
+                ["<a href='/event/" ?EventId "/" ?Iteration "/book'>Book</a>"] sconcat ?ActionsHTML.
+            ).).
+
+            ["<div style='display: flex; justify-content: space-between; flex-direction:column; '>
+            <div style='display: flex; justify-content: space-between;'>
+                <div>" ?IterationTimeStampStr " - " ?EventEnd "</div> 
+                <div style='display: flex; justify-content: flex-end;'>" ?Bookings "/" ?Capacity "</div>
+            </div>
+            <div style='display: flex; justify-content: space-between;'>
+                <div>" ?EventName "</div>
+                <div>
+                    " ?ActionsHTML "
+                </div>
+            </div>
+            </div>"] sconcat ?EventRow.
+        )] collect ?EventRowsList.
+        
+        (
+            ?EventRowsList = [].
+            ?EventRows = "<div style='padding: 6px; color: #666; font-style: italic;'>No events</div>".
+        ) or (
+            ?EventRowsList sconcat ?EventRows.
+        ).
+        
+        ["<details open>
+            <summary>" ?DayColumnHeaderTimestamp "</summary>
+            <div>" ?EventRows "</div>
+        </details>"] sconcat ?VerticalDayAccordion.
+    )] [collect >> sconcat] ?VerticalAccordions.
     ?Txn2 lmdbEnd [].
         system log ["TTTTTTTTTTTTTTT 10: " ?CalendarId].
+    
+    // Build pagination controls
+    ?Page [- 1] ?PrevPage.
+    ?Page [+ 1] ?NextPage.
+    
+    // Build current path for pagination links
+    (
+        ?Path [splitString "/"] ["" "calendar" ?CalendarId].
+        ["/calendar/" ?CalendarId] sconcat ?BasePath.
+    ) or (
+        ?BasePath = "/".
+    ).
+    
+    // Format date strings for display
+    ?WeekStart [timeStampToString "%d %b"] ?WeekStartDisplay.
+    ?WeekEnd [timeStampToString "%d %b"] ?WeekEndDisplay.
+    ?Today [timeStampToString "%d %b"] ?TodayDisplay.
+    ?VerticalEnd [timeStampToString "%d %b"] ?VerticalEndDisplay.
+
+    // Build pagination controls HTML
+    ["<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;'>
+        <div style='display: flex; align-items: center; gap: 1rem;'>
+            <a href='" ?BasePath "?page=" ?PrevPage "'><button style='padding: 8px 12px;'>&lt;</button></a>
+            <span data-view='auto'>
+                <span class='date-range-horizontal'>" ?WeekStartDisplay " - " ?WeekEndDisplay "</span>
+                <span class='date-range-vertical'>" ?TodayDisplay " - " ?VerticalEndDisplay "</span>
+            </span>
+            <a href='" ?BasePath "?page=" ?NextPage "'><button style='padding: 8px 12px;'>&gt;</button></a>
+        </div>
+        <div style='display: flex;' >
+            <label style='align-content: center; margin-right: 0.5rem; margin-bottom: 0rem;' for='view-selector'>View:</label>
+            <select id='view-selector' onchange='document.querySelectorAll(\"[data-view]\").forEach(el => el.setAttribute(\"data-view\", this.value))'>
+                <option value='auto'>Auto</option>
+                <option value='horizontal'>Horizontal</option>
+                <option value='vertical'>Vertical</option>
+            </select>
+        </div>
+    </div>"] sconcat ?PaginationHTML.
+    
     ["
     <style>
-        .column-stack { display: flex; flex-direction: column; }
-        .column-stack.horizontal { flex-direction: row; overflow-x: auto; min-width: 100%; }
-        .column-stack.auto { flex-direction: column; }
-        @media (min-width: 768px) { .column-stack.auto { flex-direction: row; } }
-        .column-stack > div { border: 1px solid #ccc; }
-        .column-stack.horizontal > div { flex: 0 0 200px; min-width: 200px; }
-        .column-stack.auto > div { flex: 1; min-width: 0; }
-        .column-stack:not(.horizontal):not(.auto) > div { flex: 1; min-width: 0; }
-        .column-stack > div > div:first-child { background-color: #eee; font-weight: bold; padding: 10px; }
-        .column-stack > div > div:last-child { display: flex; flex-direction: column; }
-        .column-stack > div > div:last-child > div { padding: 10px; border-bottom: 1px solid #eee; }
-        .column-stack > div > div:last-child > div:last-child { border-bottom: none; } 
+        /* Horizontal view styling */
+        .horizontal-view { display: flex; flex-direction: row; overflow-x: auto; min-width: 100%; }
+        .horizontal-view > div { border: 1px solid #ccc; flex: 0 0 auto; min-width: 14.2%; }
+        .horizontal-view > div > div:first-child { background-color: #eee; font-weight: bold; padding: 10px; }
+        .horizontal-view > div > div:last-child { display: flex; flex-direction: column; }
+        .horizontal-view > div > div:last-child > div { padding: 6px; border-bottom: 1px solid #eee; }
+        .horizontal-view > div > div:last-child > div:last-child { border-bottom: none; }
+        
+        /* Show/hide views based on data-view attribute */
+        [data-view='vertical'] .horizontal-view { display: none; }
+        [data-view='horizontal'] .vertical-view { display: none; }
+        
+        /* Date range visibility - default hidden, show based on data-view */
+        .date-range-horizontal, .date-range-vertical { display: none; }
+        
+        /* Show appropriate date range based on data-view attribute */
+        [data-view='vertical'] .date-range-vertical { display: inline; }
+        [data-view='horizontal'] .date-range-horizontal { display: inline; }
+        [data-view='auto'] .date-range-vertical { display: inline; }
+        @media (min-width: 768px) {
+            [data-view='auto'] .date-range-vertical { display: none; }
+            [data-view='auto'] .date-range-horizontal { display: inline; }
+        }
+        
+        /* Auto mode: responsive switching */
+        [data-view='auto'] .vertical-view { display: block; }
+        [data-view='auto'] .horizontal-view { display: none; }
+        @media (min-width: 768px) { 
+            [data-view='auto'] .vertical-view { display: none; }
+            [data-view='auto'] .horizontal-view { display: flex; }
+        }
+        
+        /* Accordion styling for vertical view */
+        .vertical-view details { border: 1px solid #ccc; border-radius: 4px; }
+        .vertical-view details summary { background-color: #eee; padding: 6px; font-weight: bold; cursor: pointer; }
+        .vertical-view details > div { display: flex; flex-direction: column; }
+        .vertical-view details > div > div { padding: 6px; border-bottom: 1px solid #eee; }
+        .vertical-view details > div > div:last-child { border-bottom: none; }
     </style>
 
-    <div class='column-stack'>" ?DayColumns "</div>"] sconcat ?EventsTableHTML.
+    " ?PaginationHTML "
+    <div data-view='auto'>
+        <div class='horizontal-view'>" ?DayColumns "</div>
+        <div class='vertical-view'>
+            " ?VerticalAccordions "
+        </div>
+    </div>"] sconcat ?EventsTableHTML.
 ) => (?R eventsTable ?EventsTableHTML.).
+
+
+
+?S bench:(
+    system now ?NowPerf.
+    system call ?G.
+    system now ?NowPerf2.
+    ?NowPerf2 [- ?NowPerf] ?Elapsed.
+    system log [?S ?Elapsed].
+) ?G. 

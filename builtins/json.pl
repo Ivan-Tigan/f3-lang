@@ -23,6 +23,9 @@ user:p(Graph, jsonToString, JsonString) :-
 % Helper: Convert SWI-Prolog JSON term to F3 graph format
 json_to_graph(json(Fields), graph(GraphFields)) :-
     maplist(json_field_to_graph, Fields, GraphFields).
+json_to_graph(Array, ArrayResult) :-
+    is_list(Array), !, % Handle root JSON arrays
+    maplist(json_array_element_to_graph, Array, ArrayResult).
 
 json_field_to_graph(Name=json(SubFields), p(Name,=,graph(GraphSubFields))) :-
     !, % Cut for when we have nested JSON objects
@@ -50,6 +53,9 @@ json_array_element_to_graph(Value, Value).
 % Helper: Convert F3 graph format to SWI-Prolog JSON term
 graph_to_json(graph(GraphFields), json(Fields)) :-
     maplist(graph_field_to_json, GraphFields, Fields).
+graph_to_json(Array, ArrayResult) :-
+    is_list(Array), !, % Handle root arrays
+    maplist(graph_array_element_to_json, Array, ArrayResult).
 
 graph_field_to_json(p(Name,=,graph(GraphSubFields)), Name=json(SubFields)) :-
     !, % Cut for nested graph objects
@@ -152,6 +158,38 @@ test(array_round_trip) :-
     p(OriginalGraph, jsonToString, JsonString),
     p(JsonString, parseJson, ParsedGraph),
     OriginalGraph = ParsedGraph.
+
+test(parse_root_json_array) :-
+    % Test parsing JSON when root is an array
+    JsonString = '["apple", "banana", "cherry"]',
+    p(JsonString, parseJson, Result),
+    Result = ["apple", "banana", "cherry"].
+
+test(parse_root_json_array_with_objects) :-
+    % Test parsing JSON array with objects
+    JsonString = '[{"name": "Alice", "age": 25}, {"name": "Bob", "age": 30}]',
+    p(JsonString, parseJson, Result),
+    Result = [
+        graph([p(name,=,"Alice"), p(age,=,25)]),
+        graph([p(name,=,"Bob"), p(age,=,30)])
+    ].
+
+test(root_array_round_trip) :-
+    % Test root array bidirectional functionality
+    OriginalArray = ["red", "blue", "green"],
+    p(OriginalArray, jsonToString, JsonString),
+    p(JsonString, parseJson, ParsedArray),
+    OriginalArray = ParsedArray.
+
+test(root_array_with_objects_round_trip) :-
+    % Test root array with objects bidirectional functionality
+    OriginalArray = [
+        graph([p(name,=,"Alice"), p(age,=,25)]),
+        graph([p(name,=,"Bob"), p(age,=,30)])
+    ],
+    p(OriginalArray, jsonToString, JsonString),
+    p(JsonString, parseJson, ParsedArray),
+    OriginalArray = ParsedArray.
 
 :- end_tests(json_builtin).
 :- set_test_options([silent(false)]).
