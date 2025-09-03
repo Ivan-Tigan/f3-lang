@@ -36,7 +36,8 @@ f3Auth encryptionSecretKey "Some secret key";
 <link rel=\"stylesheet\" href=\"https://npmcdn.com/select-combobox/dist/combobox.css\">
 <link rel=\"stylesheet\" type=\"text/css\" href=\"https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css\">
 <script type=\"text/javascript\" src=\"https://cdn.jsdelivr.net/npm/toastify-js\"></script>
-
+  <script src=\"https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js\"></script>
+    <script src=\"https://cdn.jsdelivr.net/npm/htmx-ext-preload@2.1.0\"></script>
 
 <link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic'>
 <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
@@ -61,7 +62,7 @@ p.breadcrumbs a:not(:first-child)::before, p.breadcrumbs span:not(:first-child):
 </style>
 
 
- </head> <body><main class='container'>" ?Nav ?S "</main>" ?ToastHTML "</body></html>" ] sconcat ?H. ) 
+ </head> <body hx-ext=\"preload\"><main class='container'>" ?Nav ?S "</main>" ?ToastHTML "</body></html>" ] sconcat ?H. ) 
 => (?XS [buildHTML ?R] ?H.).
 
 

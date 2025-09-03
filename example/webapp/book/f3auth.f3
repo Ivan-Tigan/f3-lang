@@ -57,8 +57,12 @@
 
 (
     f3Auth clientId ?ClientId; clientSecret ?ClientSecret; loginPath ?LoginPath; callbackPath ?CallbackPath; appDomain ?AppDomain; loginRedirect ?LoginRedirect. 
-    ?R match ( ?RID a get; path ?CallbackPath; protocol ?Protocol; port ?Port; params ( code = ?Code. state = ?State. ); cookies ( f3auth_state = ?State. f3auth_referer = ?F3AuthReferer. ). ).
-    system cut [].
+    system log [jjjjjjjjjjjjjjjjjjjjjjj 1 ?R].
+    ?R match ( ?RID a get; path ?CallbackPath; protocol ?Protocol; port ?Port; params ( code = ?Code. state = ?State. ).).
+    
+    system log [jjjjjjjjjjjjjjjjjjjjjjj 2].
+    ?R cookies ( f3auth_state = ?State. f3auth_referer = ?F3AuthReferer. ). 
+    system log [jjjjjjjjjjjjjjjjjjjjjjj 3].
     [?Protocol "://" ?AppDomain ":" ?Port ?CallbackPath] sconcat ?CallbackURL.
     ( 
         tokenReq a post; 
@@ -73,11 +77,13 @@
         ).
      ) [fetch >> match] ( response body ( id_token = ?IdToken. ). ).
 
+    system log [jjjjjjjjjjjjjjjjjjjjjjj 3].
     f3Auth encryptionSecretKey ?F3AuthEncryptionSecretKey.
     ?IdToken [[splitString "."] >> [1] >> [reverse base64Url]] ?DecodedPayload.
     ?DecodedPayload [parseJson >> match] ( sub = ?UserId.  name = ?UserName.  email = ?UserEmail.).
     ?DecodedPayload [encrypt ?F3AuthEncryptionSecretKey] ?EncryptedPayload.
     
+    system log [jjjjjjjjjjjjjjjjjjjjjjj 4].
     ["f3_auth_encrypted_session=" ?EncryptedPayload "; HttpOnly; Secure; Path=/; Max-Age=3600"] sconcat ?AuthCookie.
     
 ) => ( 

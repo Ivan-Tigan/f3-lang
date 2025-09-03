@@ -228,12 +228,13 @@
     // Build pagination controls HTML
     ["<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;'>
         <div style='display: flex; align-items: center; gap: 1rem;'>
-            <a href='" ?BasePath "?page=" ?PrevPage "'><button style='padding: 8px 12px;'>&lt;</button></a>
+
+            <a href='" ?BasePath "?page=" ?PrevPage "' preload='mouseover'><button style='padding: 8px 12px;'>&lt;</button></a>
             <span data-view='auto'>
                 <span class='date-range-horizontal'>" ?WeekStartDisplay " - " ?WeekEndDisplay "</span>
                 <span class='date-range-vertical'>" ?TodayDisplay " - " ?VerticalEndDisplay "</span>
             </span>
-            <a href='" ?BasePath "?page=" ?NextPage "'><button style='padding: 8px 12px;'>&gt;</button></a>
+            <a href='" ?BasePath "?page=" ?NextPage "' preload='mouseover'><button style='padding: 8px 12px;'> &gt; </button> </a>
         </div>
         <div style='display: flex;' >
             <label style='align-content: center; margin-right: 0.5rem; margin-bottom: 0rem;' for='view-selector'>View:</label>
@@ -305,3 +306,20 @@
     ?NowPerf2 [- ?NowPerf] ?Elapsed.
     system log [?S ?Elapsed].
 ) ?G. 
+
+
+?R response:(
+    ?R match (?Rid a get; path "/test". ).
+) (?Rid status 200; contentType "text/html"; body "
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src=\"https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js\"></script>
+    <script src=\"https://cdn.jsdelivr.net/npm/htmx-ext-preload@2.1.0\"></script>
+  </head>
+  <body hx-ext=\"preload\">
+    <a href=\"/?page=4\" preload=\"mouseover\">Next Page</a>
+  </body>
+</html>
+
+".).
