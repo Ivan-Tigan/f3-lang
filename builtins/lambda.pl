@@ -7,6 +7,9 @@ l2c([X|Xs], (X, Y)) :- l2c(Xs, Y).
 user:p(system, call, graph(Facts)) :- 
     l2c(Facts, Conj), call(Conj).
 
+user:p(Witness, distinct, graph(Facts)) :- 
+    l2c(Facts, Conj), distinct(Witness, Conj).
+
 user:p(Input, [fun, Input, ->, graph(Facts), Output], return, Output) :- 
     l2c(Facts, Conj), call(Conj).   
 

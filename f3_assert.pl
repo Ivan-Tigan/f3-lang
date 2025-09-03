@@ -19,6 +19,7 @@
 % :- use_module(builtins/'list-parser').
 :- use_module(builtins/lambda).
 :- use_module(builtins/ziplib).
+:- use_module(builtins/prove).
 
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
@@ -121,6 +122,10 @@ p(graph(G1), or, graph(G2)) :-
 
 p(XS, sconcat, Res) :- atomics_to_string(XS, Res) .
 p(XS, [sconcat, Sep], Res) :- atomics_to_string(XS, Sep, Res) .
+
+p(S, parseAtom, Res) :- 
+   atom_string(Res, S).
+
 p(S, [splitString, Separator], Res) :- 
    atom_string(S, SStr),
    % format(user_error, "ZZZZZZZZZZZZZZZZZZZZ Splitting string: ~q with separator: ~q~n", [SStr, Separator]),

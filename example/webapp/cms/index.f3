@@ -1,0 +1,161 @@
+CMSSpec tables (
+    blog slug text; title text; content html; published date.
+    faq question text; answer html; order number.
+    config profitMargin number.
+).
+?xs (?xs sconcat ?r.):buildHTML ?r.
+// Main page - list all tables
+(
+    ?R match (?RID a get; path "/".). 
+    [?LI (
+        ?TableName distinct (
+            CMSSpec [tables >> match] ( ?TableName ?_Col ?_Type.).
+        ).
+        ["<li><a href='/table/" ?TableName "'>" ?TableName "</a></li>"] sconcat ?LI.
+    )] [collect >> sconcat] ?ListItems.
+    [
+        "<h1>CMS Admin</h1>
+        <ul>"  ?ListItems "</ul>"
+    ] sconcat ?HTML.
+) => (?R response (?RID status 200; headers ("Content-Type" = "text/html; charset=utf-8".); body ?HTML.).).
+
+// Table listing page
+(
+    ?R match (?RID a get; path ?Path.).
+    ?Path [splitString "/"] ["" "table" ?TableNameS].
+    ?TableNameS parseAtom ?TableName.
+    system log [xxxx1 ?TableName].
+    [?TH (
+        ?Col distinct (
+            CMSSpec [tables >> match] ( ?TableName ?Col ?_Type.).
+            ).
+        ["<th>" ?Col "</th>"] sconcat ?TH.
+    )] [collect >> sconcat] ?TableHeaders.
+    
+    system log xxxx2.
+    ?Txn lmdbStartR "./db". 
+    [?TR (
+        
+        system log x1xxx2.
+        ?Txn lmdbQuery { ?Id a ?TableName. }.
+
+        system log xxxx3.
+        [?TD (
+            ?Col distinct (CMSSpec [tables >> match] ( ?TableName ?Col ?_Type.).).
+            ?Txn lmdbQuery { ?Id ?Col ?Value. }.
+            ["<td>" ?Value "</td>"] sconcat ?TD.
+        )] [collect >> sconcat] ?TableDataRows.    
+        system log xxxx4.
+        
+        ["<tr>" ?TableDataRows "<td>
+            <a href='/table/" ?TableName "/row/" ?Id "/edit'>Edit</a>
+            <form style='display:inline; margin-left:0.5rem;' method='post' action='/table/" ?TableNameS "/row/" ?Id "/delete'>
+                <input type='hidden' name='id' value='" ?Id "'>
+                <input type='submit' value='Delete' onclick='return confirm(\"Are you sure?\")'>
+            </form>
+        </td></tr>"] sconcat ?TR.
+    )] [collect >> sconcat] ?TableRows.
+    
+    system log [xxxx5 ?TableRows].
+    ?Txn lmdbEnd [].
+        system log [xx1xx5 ?TableName ?TableHeaders ?TableRows].
+    [
+        "<h1>" ?TableNameS "</h1>
+        <a href='/table/" ?TableNameS "/create'>Create New</a>
+        <table>
+            <tr>" ?TableHeaders "<th>Action</th></tr>
+            " ?TableRows "
+        </table>"
+    ] sconcat ?HTML.
+    system log xxxx6.
+) => (?R response (?RID status 200; headers ("Content-Type" = "text/html; charset=utf-8".); body ?HTML.).).
+
+// Create page
+(
+    ?R match (?RID a get; path ?Path.).
+    ?Path [splitString "/"] ["" "table" ?TableNameS "create"].
+    ?TableNameS parseAtom ?TableName.
+    [?Field (
+        CMSSpec [tables >> match] ( ?TableName ?Col ?Type.).
+        ["<label for='" ?Col "'>" ?Col "</label><input type='" ?Type "' name='" ?Col "'>"] sconcat ?Field.
+    )] [collect >> sconcat] ?Fields.
+    [
+        "<h1>Create " ?TableNameS "</h1>
+        <form method='post' action='/table/" ?TableNameS "/upsert'>   
+            " ?Fields "
+            <input type='submit' value='Create'>
+        </form>"
+    ] sconcat ?HTML.
+) => (?R response (?RID status 200; headers ("Content-Type" = "text/html; charset=utf-8".); body ?HTML.).).
+
+// Edit page
+(
+    ?R match (?RID a get; path ?Path.).
+    ?Path [splitString "/"] ["" "table" ?TableNameS "row" ?RowId "edit"].
+    ?TableNameS parseAtom ?TableName.
+    
+    ?Txn lmdbStartR "./db".
+    [?Field (
+        ?Col distinct ( CMSSpec [tables >> match] ( ?TableName ?Col ?Type. ).).
+        ( ?Txn lmdbQuery { ?RowId ?Col ?CurrentValue. }.) or ( ?CurrentValue = "". ).
+        ["<label for='" ?Col "'>" ?Col "</label><input type='" ?Type "' name='" ?Col "' value='" ?CurrentValue "'>"] sconcat ?Field.
+    )] [collect >> sconcat] ?Fields.
+    ?Txn lmdbEnd [].
+    
+    [
+        "<h1>Edit " ?TableNameS "</h1>
+        <form method='post' action='/table/" ?TableNameS "/upsert'>
+            <input type='hidden' name='id' value='" ?RowId "'>
+            " ?Fields "
+            <input type='submit' value='Save'>
+        </form>"
+    ] sconcat ?HTML.
+) => (?R response (?RID status 200; headers ("Content-Type" = "text/html; charset=utf-8".); body ?HTML.).).
+
+// Upsert action
+(
+    ?R match (?RID a post; path ?Path; body ?FormData.).
+    ?Path [splitString "/"] ["" "table" ?TableNameS "upsert"].
+    ?TableNameS parseAtom ?TableName.
+    system log [xxx1 ?TableName ?FormData].
+    // Get or generate ID
+    ( 
+        ?FormData match ( id = ?ExistingId. ). ?ExistingId neq "". ?Id = ?ExistingId. 
+    ) or ( 
+        system [now >> sha256] ?Suffix. [?TableNameS "_" ?Suffix] sconcat ?Id. 
+    ).
+    
+    system log xxx2.
+    // Insert data
+    ?Txn lmdbStartRW "./db".
+    ?Txn lmdbDelete { ?Id ?OldPred ?OldValue. }
+    ; lmdbInsert { ?Id a ?TableName. }.
+    system log xxx3.
+    
+    // Insert field data
+    [?_ (
+        ?FormData match ( ?Col = ?Value. ). ?Col neq id. ?Value neq "". 
+         system log xxx4.
+        ?Txn lmdbInsert { ?Id ?Col ?Value. }.
+    )] collect ?_ins.
+    
+    system log xxx5.
+    ?Txn lmdbEnd [].
+    
+    ["/table/" ?TableNameS] sconcat ?RedirectPath.
+) => (?R response (?RID status 302; headers ("Location" = ?RedirectPath.).).).
+
+// Delete action  
+(
+    ?R match (?RID a post; path ?Path.).
+    ?Path [splitString "/"] ["" "table" ?TableNameS "row" ?RowId "delete"].
+    system log [zzz1 ?TableNameS ?RowId].
+    ?Txn lmdbStartRW "./db".
+    ?Txn lmdbDelete { ?RowId ?Pred ?Value. }.
+    ?Txn lmdbEnd [].
+    
+    system log [zzz2 ?TableNameS ?RowId].
+    ["/table/" ?TableNameS] sconcat ?RedirectPath.
+) => (?R response (?RID status 302; headers ("Location" = ?RedirectPath.).).).
+
+system runWebServer 3000.
