@@ -7,28 +7,37 @@
 % Usage: system (prove solutions 20) Goal.
 % Usage: system (prove solutions 20; page 3) Goal.
 
+% Convert list of facts to conjunction
+l2c([], true).
+l2c([p(system, P, [])|Xs], (!, Y)) :- \+ var(P), P = cut, !, l2c(Xs, Y).
+l2c([X|Xs], (X, Y)) :- l2c(Xs, Y).
+
 % Extract parameters from graph, applying defaults
 extract_params([], 1, 0).
-extract_params([p(prove, solutions, N)|Rest], Solutions, Page) :- !,
-    Solutions = N,
-    extract_params(Rest, Solutions, Page).
-extract_params([p(prove, page, P)|Rest], Solutions, Page) :- !,
-    Page = P,
-    extract_params(Rest, Solutions, Page).
-extract_params([_|Rest], Solutions, Page) :-
-    extract_params(Rest, Solutions, Page).
+extract_params(Params, Solutions, Page) :- 
+    member(p(prove, solutions, Solutions), Params),
+    member(p(prove, page, Page), Params), !.
+extract_params(Params, Solutions, 0) :- 
+    member(p(prove, solutions, Solutions), Params), !.
+extract_params(Params, 1, Page) :- 
+    member(p(prove, page, Page), Params), !.
 
-% Main prove predicate - simple goal without parameters
-user:p(system, prove, Goal) :-
-    limit(1, Goal).
+
+
+% Main prove predicate - simple goal with graph
+user:p(system, prove, graph(Goal)) :-
+    l2c(Goal, Conj),
+    limit(1, Conj).
 
 % Main prove predicate - goal with parameters in graph
-user:p(system, graph(Params), Goal) :-
+user:p(system, graph(Params), graph(Goal)) :-
     member(p(prove, _, _), Params), !,
     extract_params(Params, Solutions, Page),
-    prove_with_pagination(Goal, Solutions, Page).
-
-% Execute goal with pagination using limit/2 and offset/2
-prove_with_pagination(Goal, Solutions, Page) :-
+    l2c(Goal, Conj),
     Skip is Page * Solutions,
-    offset(Skip, limit(Solutions, Goal)).
+    % user:p(system, log, [proving, with, Solutions, Page, Skip]),
+    limit(Solutions, (offset(Skip, Conj), 
+        true
+        % format(user_error, 'Offset prove ~q~n', [Conj])
+    
+    )).

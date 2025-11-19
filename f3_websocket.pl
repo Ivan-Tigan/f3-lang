@@ -4,6 +4,8 @@
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_json)).
 :- use_module(library(http/json)).
+:- use_module(library(uuid)).
+:- use_module(builtins/json).
 
 :- multifile user:p/3.
 
@@ -111,10 +113,15 @@ ws_handler(ConnectionId, HeaderPairs, Path, WebSocket) :-
          cleanup_connection(ConnectionId))
     ).
 
-% Generate WebSocket connection ID
+% Generate WebSocket connection ID using UUID v4
 generate_ws_id(ID) :-
-    get_time(Now),
-    format(atom(ID), 'ws_~w', [Now]).
+    uuid(UUID, [version(4)]),
+    format(string(ID), 'ws_~w', [UUID]).
+
+% Generate WebSocket message ID using UUID v4
+generate_message_id(ID) :-
+    uuid(UUID, [version(4)]),
+    format(string(ID), 'msg_~w', [UUID]).
 
 % Cleanup connection
 cleanup_connection(ConnectionId) :-
@@ -123,8 +130,8 @@ cleanup_connection(ConnectionId) :-
 
 % WebSocket message receive loop
 ws_receive_loop(ConnectionId, WebSocket) :-
-    ws_receive(WebSocket, Message, [format(json)]),
-    format(user_error, "Received WebSocket message: ~w~n", [Message]),
+    ws_receive(WebSocket, Message, []),
+    % format(user_error, "Received WebSocket message: ~w~n", [Message]),
     
     % Handle message based on type
     (   Message.opcode == close
@@ -132,12 +139,17 @@ ws_receive_loop(ConnectionId, WebSocket) :-
         cleanup_connection(ConnectionId)
     ;   % Process message (future implementation)
         % For now just continue receiving
+        generate_message_id(MessageId),
+        atom_string(Message.data, MessageString),
+
+        % format(user_error, "Processed message data: ~q~n", [MessageString]),
+        user:p(graph([p(MessageId, a, wsMessage), p(MessageId, data, MessageString), p(MessageId, connection, ConnectionId) ]), wsHandleMessage, []),
         ws_receive_loop(ConnectionId, WebSocket)
     ).
 
 % wsSend builtin implementation
 user:p(Pattern, wsSend, Message) :-
-    format(user_error, "WebSocket send request: ~w -> ~w~n", [Pattern, Message]),
+    % format(user_error, "WebSocket send request: ~w -> ~w~n", [Pattern, Message]),
     
     % Find all matching connections
     findall(WebSocket, 
@@ -146,7 +158,7 @@ user:p(Pattern, wsSend, Message) :-
            Connections),
     
     length(Connections, Count),
-    format(user_error, "Found ~w matching connections~n", [Count]),
+    % format(user_error, "Found ~w matching connections~n", [Count]),
     
     % Send message to all matching connections
     send_ws_message(Connections, Message).
@@ -177,12 +189,12 @@ send_ws_message([WebSocket|Rest], Message) :-
     (is_html_message(Message) ->
         % HTML message
         graph_to_html(Message, HTML),
-        format(user_error, "Sending HTML message: ~w~n", [HTML]),
+        % format(user_error, "Sending HTML message: ~w~n", [HTML]),
         ws_send(WebSocket, text(HTML))
     ;
         % JSON message
-        graph_to_json(Message, JSON),
-        format(user_error, "Sending JSON message: ~w~n", [JSON]),
+        json_builtin:graph_to_json(Message, JSON),
+        % format(user_error, "Sending JSON message: ~w~n", [JSON]),
         ws_send(WebSocket, json(JSON))
     ),
     % Continue with remaining connections
@@ -243,21 +255,3 @@ format_attributes(Attrs, Result) :-
 
 format_attribute(Name-Value, Str) :-
     format(string(Str), '~w="~w"', [Name, Value]).
-
-% Convert graph to JSON
-graph_to_json(graph(Triples), Dict) :-
-    findall(Key-Value, (
-        member(p(Key, =, RawValue), Triples),
-        process_json_value(RawValue, Value)
-    ), Pairs),
-    dict_pairs(Dict, json, Pairs).
-
-% Process JSON values
-process_json_value(graph(Triples), NestedDict) :-
-    !,  % Only for graph values
-    findall(SubKey-SubValue, (
-        member(p(SubKey, =, RawSubValue), Triples),
-        process_json_value(RawSubValue, SubValue)
-    ), SubPairs),
-    dict_pairs(NestedDict, json, SubPairs).
-process_json_value(Value, Value).  % Direct values

@@ -22,6 +22,9 @@ const pString = ws
         P.alt(
           P.string('\\"').result('\\"'),
           P.string("\\\\").result("\\"),
+          // P.string("\\n").result("\\n"),
+          // P.string("\\t").result("\\t"),
+          // P.string("\\r").result("\\r"),
           P.noneOf('"\\')
         )
           .many()

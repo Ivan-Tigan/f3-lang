@@ -9,6 +9,7 @@
 :- use_module(library(http/http_client)).
 :- use_module(library(http/http_header)).
 :- use_module(library(http/json)).
+:- use_module(library(uuid)).
 
 % Basic server setup
 :- dynamic server_port/1.
@@ -229,8 +230,8 @@ multipart_mime_to_triple(mime(Properties, Value, []), p(Name, =, ProcessedValue)
             p(filename, =, Filename),
             p(content, =, ByteArray)
         ])
-    ;   % Regular form field - keep as string
-        ProcessedValue = Value
+    ;   % Regular form field - convert to string for consistency
+        (atom(Value) -> atom_string(Value, ProcessedValue) ; ProcessedValue = Value)
     ),
     format(user_error, "Processed field ~w with value type ~w~n", [Name, ProcessedValue]).
 
@@ -453,11 +454,10 @@ process_json_pairs([Key-Value|Rest], [Key-Value|ProcessedRest]) :-
     % Handle direct values
     process_json_pairs(Rest, ProcessedRest).
 
-% Generate unique request ID
+% Generate unique request ID using UUID v4
 generate_request_id(ID) :-
-    get_time(Now),
-    format(atom(TempID), 'req_~w', [Now]),
-    atom_string(TempID, ID).
+    uuid(UUID, [version(4)]),
+    format(string(ID), 'req_~w', [UUID]).
 
 % Start HTTP server and keep it running
 start_server(Port) :-

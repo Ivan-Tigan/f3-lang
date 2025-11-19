@@ -20,6 +20,7 @@
 :- use_module(builtins/lambda).
 :- use_module(builtins/ziplib).
 :- use_module(builtins/prove).
+:- use_module(builtins/assert).
 
 % :- [f3p].  % Include the parser file
 :- dynamic loaded/1.
@@ -142,8 +143,15 @@ p(X, [reverse, Pred], Y) :-
    
 p([Xs, Ys], lconcat, Res) :- 
    append(Xs, Ys, Res).
+% Recursive graph concatenation
+p([], gconcat, graph([])) :- !.
+p([graph(G)], gconcat, graph(G)) :- !.
 p([graph(G1), graph(G2)], gconcat, graph(Res)) :-
+   !,
    append(G1, G2, Res).
+p([graph(G1)|Rest], gconcat, graph(Res)) :-
+   p(Rest, gconcat, graph(RestRes)),
+   append(G1, RestRes, Res).
 p(Xs, [Index], Element) :- 
     number(Index),
     !,
