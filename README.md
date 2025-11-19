@@ -5,8 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-linux-lightgrey)
 ![Status](https://img.shields.io/badge/status-experimental-orange)
 
-A simple, powerful, extensible logic programming language based on triples.
-
+F3 is a graph-oriented, triple-based general purpose logic programming language with a first-class graph database (based on LMDB) and constraint solvers (CLPFD/CLPQR).
 
 
 ## Install
@@ -33,9 +32,6 @@ cd example
 f3 -p 3000:3000 run todo.f3
 ```
 
-## Language Overview
-
-F3 combines logic programming with modern features: persistent triple store (LMDB), constraint solving (CLPFD/CLPQR), HTTP/WebSocket servers, and a declarative syntax. Programs are written as triples with backward-chaining rules for inference.
 
 ## Language Examples
 
