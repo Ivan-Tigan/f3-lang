@@ -110,27 +110,32 @@ system prove (?X likes ?Y. ?Y age ?Age.).
 ; lmdbEnd [].
 ```
 
+### Compound Predicates
+
+```f3
+// From example/webapp/book/time.f3
+?Days [* ?SecondsPerDay] ?DaySeconds.
+?Timestamp [+ ?DaySeconds] ?Result.
+
+// From example/webapp/game/index.f3
+[?PX ?PY] [[- [?OldX ?OldY]] >> normalized >> [* 25.0] >> [* ?delta] >> [+ [?OldX ?OldY]]] [?NewX ?NewY].
+```
+
 ### Constraint Solving (CLPFD)
 
 ```f3
-// Find solutions where X + Y = 10
-system query [[result X ?X Y ?Y] (
-    clpfd constraint [
-        ?X + ?Y = 10
-        & ?X in 1 5
-        & ?Y in 3 8
-    ];
+// From example/clpfd.f3
+system query [[basic X ?X Y ?Y] (
+    clpfd constraint [?X + ?Y = 10 & ?X in 1 5 & ?Y in 3 8];
     label [?X ?Y].
 )].
 
-// Scheduling with time constraints
-?EventStartT [+ ?Iteration * ?SecondsPerWeek] ?EventIterationStartT.
+// From example/webapp/book/my-bookings.f3
 clpfd constraint [
-    ?T1 + 2 =< ?T2  // Task 1 takes 2 time units
-    & ?T2 + 1 =< ?T3
-    & ?T3 =< 4
+    ?EventStartT + ?Iteration * ?SecondsPerWeek = ?EventIterationStartT
 ].
+clpfd label [?EventIterationStartT].
 ```
 
-See `/example` for examples.
+See `/example` for more examples.
 
