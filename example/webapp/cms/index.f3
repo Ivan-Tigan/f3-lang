@@ -1,73 +1,236 @@
-CMSSpec tables (
-    blog slug text; title text; content html; published date.
-    faq question text; answer html; order number.
-    config profitMargin number.
-).
-?xs (?xs sconcat ?r.):buildHTML ?r.
+// CMSSpec tables {
+    // blog slug text; image file; title text; content html; published date; metadata json.
+    // faq question text; answer html; order number.
+    // config profitMargin number.
+// };
+// ; login "admin":"90321jdn1ub"
+// ; apiKey "jbndiwuqbewqnuwqbn21u390u13902jd309"; 
+
+// uploadsURLPath "cms-files".
+// system runWebServer 3000.
+// ?R permission granted.
+
+
+lmdb disable hash.
+(CMSSpec uploadsURLPath ?Y.) => ( CMSSpec uploadsURLPathInferred ?Y. ).   
+( system not { CMSSpec uploadsURLPath ?Path. }. ) => ( CMSSpec uploadsURLPathInferred "cms-uploads". ).
+?R permission:(
+    ?R match (?RID headers (authorization = ?AuthHeader.).).
+    CMSSpec login ?User:?Pass. 
+    [?User ?Pass] [[sconcat ":"] >> base64] ?Encoded.
+    ?AuthHeader [splitString " "] [ "Basic" ?Encoded ].
+    system cut [].
+) granted.
+?R permission:(
+    ?R match (?RID headers ?H.).
+    ?R match (?RID headers (authorization = ?AuthHeader.).).
+    CMSSpec apiKey ?ApiKey.
+    ?AuthHeader [splitString " "] [ "Bearer" ?ApiKey ].
+    system cut [].
+) granted.
+?R permission:(
+    (CMSSpec login ?_User:?_Pass.) or (CMSSpec apiKey ?_ApiKey.).
+    system not { ?R permission granted. }.
+    system log [PERMISSION WILL BE DENIED].
+) denied.
+(
+    ?R permission denied.   
+    system cut [].
+) => (?R response (?RID status 401; headers ("WWW-Authenticate" = "Basic realm=\"CMS Admin\"".); body "Unauthorized".).).
+
+(?xs sconcat ?r. [
+"<!DOCTYPE html>
+<html>
+<head>
+    <title>CMS</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.3/tinymce.min.js'></script>
+    <script src='https://Ivan-Tigan.github.io/json-editor-component/json-editor.js'></script>
+
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.6; }
+        table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+        th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+        th { background-color: #f5f5f5; font-weight: 600; }
+        td { height: 50px; overflow: hidden; position: relative; vertical-align: top; }
+        td div { position: absolute; top: 0; left: 0; right: 0; bottom: 0; padding: 0.5rem; overflow: auto; }
+        a { color: #0066cc; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        button, input[type=submit] { 
+            background: #0066cc; color: white; border: none; padding: 0.5rem 1rem; 
+            border-radius: 4px; cursor: pointer; 
+        }
+        button:hover, input[type=submit]:hover { background: #0052a3; }
+        form { margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1rem; }
+        label { display: block; font-weight: 600; }
+        input, textarea, select { 
+            width: 100%; padding: 0.75rem; border: 1px solid #ccc; 
+            border-radius: 4px; box-sizing: border-box; font-size: 1rem;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none; border-color: #0066cc; box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+        }
+        input[type=submit] { 
+            padding: 0.75rem 1.5rem; width: auto; align-self: flex-start;
+        }
+
+        nav { margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            tinymce.init({
+                selector: 'textarea.html-editor',
+                plugins: 'advlist autolink lists link image charmap anchor searchreplace visualblocks code fullscreen table wordcount',
+                toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image | code',
+                block_formats: 'Paragraph=p; Heading 1=h1; Heading 2=h2; Heading 3=h3; Heading 4=h4; Heading 5=h5; Heading 6=h6; Preformatted=pre',
+                images_upload_url: '/upload-image',
+                images_upload_credentials: true,
+                height: 300,
+                menubar: false,
+                readonly: false,
+                branding: false
+            });
+        });
+    </script>
+</head>
+<body>" ?r "</body>
+</html>"] sconcat ?HTML.) => (?xs buildHTML ?HTML.).
 // Main page - list all tables
 (
     ?R match (?RID a get; path "/".). 
     [?LI (
         ?TableName distinct (
-            CMSSpec [tables >> match] ( ?TableName ?_Col ?_Type.).
+            CMSSpec tables { ?TableName ?_Col ?_Type.}.
         ).
         ["<li><a href='/table/" ?TableName "'>" ?TableName "</a></li>"] sconcat ?LI.
     )] [collect >> sconcat] ?ListItems.
     [
         "<h1>CMS Admin</h1>
         <ul>"  ?ListItems "</ul>"
-    ] sconcat ?HTML.
+    ] buildHTML ?HTML.
 ) => (?R response (?RID status 200; headers ("Content-Type" = "text/html; charset=utf-8".); body ?HTML.).).
+
+// JSON Table listing API endpoint  
+(
+    ?R match (?RID a get; path ?Path; headers (accept = ?AcceptHeader.). ).
+    ?Path [splitString "/"] ["" "table" ?TableNameS].
+    ?TableNameS parseAtom ?TableName.
+    
+    ".*application/json.*" reMatch ?AcceptHeader.
+    
+    // Extract pagination parameters
+    (?R match (?RID params ( page = ?PageStr. ).). 
+    ?PageStr parseInteger ?Page.) or (?Page = 0.).
+    
+    // Rows per page
+    (?R match (?RID params ( rows = ?RowsStr. ).). ?RowsStr parseInteger ?Rows.) or (?Rows = 10.).
+    
+    ?Rows [idiv 1] ?RowsDiv.
+    
+    ?Txn lmdbStartR "./db".
+    
+    [?RowJSON (
+        system (prove solutions ?RowsDiv; page ?Page.) (
+        ?Txn lmdbQuery { ?Id a ?TableName. }.
+
+        [?ColJSON (
+            ?Col distinct (CMSSpec tables { ?TableName ?Col ?_Type. }.).
+            (?Txn lmdbQuery { ?Id ?Col ?Value. }.) or (?Value = "".).
+            (?Col = ?Value.) = ?ColJSON.
+        )] [collect >> gconcat] ?Cols.
+
+        [(id = ?Id.)  ?Cols ] gconcat ?RowJSON.
+        ).
+    )] [collect >> jsonToString] ?JSONResponse.
+    
+    ?Txn lmdbEnd [].
+    
+) => (?R response (?RID status 200; headers ("Content-Type" = "application/json".); body ?JSONResponse.).).
 
 // Table listing page
 (
-    ?R match (?RID a get; path ?Path.).
+    ?R match (?RID a get; path ?Path; headers (accept = ?AcceptHeader.). ).
     ?Path [splitString "/"] ["" "table" ?TableNameS].
     ?TableNameS parseAtom ?TableName.
-    system log [xxxx1 ?TableName].
+    
+    ".*text/html.*" reMatch ?AcceptHeader.
+    // Extract pagination parameters
+    (?R match (?RID params ( page = ?PageStr. ).). 
+    ?PageStr parseInteger ?Page.) or (?Page = 0.).
+    ?Page [+ 1] ?NextPage; [- 1] ?PrevPage.
+    ( ?PrevPage >= 0. ["<button type='submit' name='page' value='" ?PrevPage "'>Previous</button>"] sconcat ?PrevButton. ) or ( ?PrevButton = "". ).
+    
+    // Rows per page
+    (?R match (?RID params ( rows = ?RowsStr. ).). ?RowsStr parseInteger ?Rows.) or (?Rows = 10.).
+    
+    // Create selected attributes for dropdown
+    (?Rows = 10. ?Selected10 = " selected".) or (?Selected10 = "".).
+    (?Rows = 25. ?Selected25 = " selected".) or (?Selected25 = "".).
+    (?Rows = 50. ?Selected50 = " selected".) or (?Selected50 = "".).
+    ?Rows [idiv 1] ?RowsDiv.
     [?TH (
         ?Col distinct (
-            CMSSpec [tables >> match] ( ?TableName ?Col ?_Type.).
+            CMSSpec tables { ?TableName ?Col ?_Type. }.
             ).
         ["<th>" ?Col "</th>"] sconcat ?TH.
     )] [collect >> sconcat] ?TableHeaders.
     
-    system log xxxx2.
     ?Txn lmdbStartR "./db". 
     [?TR (
-        
-        system log x1xxx2.
+        system (prove solutions ?RowsDiv; page ?Page.) (
         ?Txn lmdbQuery { ?Id a ?TableName. }.
 
-        system log xxxx3.
         [?TD (
-            ?Col distinct (CMSSpec [tables >> match] ( ?TableName ?Col ?_Type.).).
-            ?Txn lmdbQuery { ?Id ?Col ?Value. }.
-            ["<td>" ?Value "</td>"] sconcat ?TD.
+            ?Col distinct (CMSSpec tables { ?TableName ?Col ?Type. }.).
+            (?Txn lmdbQuery { ?Id ?Col ?Value. }.) or (?Value = "".).
+            // Check if this is a file type and value looks like a URL
+            ( ?Type = file. ?Value neq "". ?Value [splitString "/"] ?Parts. ?Parts [length >> >] 1.
+                ["<td><div><a href='" ?Value "' target='_blank'>" ?Value "</a></div></td>"] sconcat ?TD.
+            ) or (
+                ["<td><div>" ?Value "</div></td>"] sconcat ?TD.
+            ).
         )] [collect >> sconcat] ?TableDataRows.    
-        system log xxxx4.
         
-        ["<tr>" ?TableDataRows "<td>
+        ["<tr>" ?TableDataRows "<td><div style='display:flex; gap:0.5rem; align-items:center;'>
             <a href='/table/" ?TableName "/row/" ?Id "/edit'>Edit</a>
             <form style='display:inline; margin-left:0.5rem;' method='post' action='/table/" ?TableNameS "/row/" ?Id "/delete'>
                 <input type='hidden' name='id' value='" ?Id "'>
                 <input type='submit' value='Delete' onclick='return confirm(\"Are you sure?\")'>
             </form>
-        </td></tr>"] sconcat ?TR.
+        </div></td></tr>"] sconcat ?TR.
+        ).
     )] [collect >> sconcat] ?TableRows.
     
-    system log [xxxx5 ?TableRows].
     ?Txn lmdbEnd [].
-        system log [xx1xx5 ?TableName ?TableHeaders ?TableRows].
     [
-        "<h1>" ?TableNameS "</h1>
+        "<nav><a href='/'>Tables</a></nav>
+        <h1>" ?TableNameS "</h1>
         <a href='/table/" ?TableNameS "/create'>Create New</a>
+        
+        <div style='margin: 1rem 0; display: flex; gap: 1rem; align-items: center;'>
+            <form method='get'>
+                <input type='hidden' name='page' value='" ?Page "'>
+                <label>Rows per page: 
+                    <select name='rows' onchange='this.form.submit()'>
+                        <option value='10'" ?Selected10 ">10</option>
+                        <option value='25'" ?Selected25 ">25</option>
+                        <option value='50'" ?Selected50 ">50</option>
+                    </select>
+                </label>
+            </form>
+            <form method='get' style='display: flex; gap: 0.5rem; align-items: center;'>
+                <input type='hidden' name='rows' value='" ?Rows "'>
+                " ?PrevButton "
+                <span>Page " ?Page "</span>
+                <button type='submit' name='page' value='" ?NextPage "'>Next</button>
+            </form>
+        </div>
+        
         <table>
             <tr>" ?TableHeaders "<th>Action</th></tr>
             " ?TableRows "
         </table>"
-    ] sconcat ?HTML.
-    system log xxxx6.
+    ] buildHTML ?HTML.
 ) => (?R response (?RID status 200; headers ("Content-Type" = "text/html; charset=utf-8".); body ?HTML.).).
 
 // Create page
@@ -76,16 +239,21 @@ CMSSpec tables (
     ?Path [splitString "/"] ["" "table" ?TableNameS "create"].
     ?TableNameS parseAtom ?TableName.
     [?Field (
-        CMSSpec [tables >> match] ( ?TableName ?Col ?Type.).
-        ["<label for='" ?Col "'>" ?Col "</label><input type='" ?Type "' name='" ?Col "'>"] sconcat ?Field.
+        CMSSpec tables { ?TableName ?Col ?Type. }.
+        ( ?Type = html. ["<label for='" ?Col "'>" ?Col "</label><textarea class='html-editor' name='" ?Col "'></textarea>"] sconcat ?Field. ) or
+        (
+            ( ?Type = json. ["<label for='" ?Col "'>" ?Col "</label><json-editor name='" ?Col "' mode='code'></json-editor>"] sconcat ?Field. ) or
+            ( ["<label for='" ?Col "'>" ?Col "</label><input type='" ?Type "' name='" ?Col "'>"] sconcat ?Field. ).
+        ).
     )] [collect >> sconcat] ?Fields.
     [
-        "<h1>Create " ?TableNameS "</h1>
-        <form method='post' action='/table/" ?TableNameS "/upsert'>   
+        "<nav><a href='/'>Tables</a> / <a href='/table/" ?TableNameS "'>" ?TableNameS "</a></nav>
+        <h1>Create " ?TableNameS "</h1>
+        <form method='post' action='/table/" ?TableNameS "/upsert' enctype='multipart/form-data'>   
             " ?Fields "
             <input type='submit' value='Create'>
         </form>"
-    ] sconcat ?HTML.
+    ] buildHTML ?HTML.
 ) => (?R response (?RID status 200; headers ("Content-Type" = "text/html; charset=utf-8".); body ?HTML.).).
 
 // Edit page
@@ -96,20 +264,26 @@ CMSSpec tables (
     
     ?Txn lmdbStartR "./db".
     [?Field (
-        ?Col distinct ( CMSSpec [tables >> match] ( ?TableName ?Col ?Type. ).).
+        ?Col distinct ( CMSSpec tables { ?TableName ?Col ?Type. }.).
         ( ?Txn lmdbQuery { ?RowId ?Col ?CurrentValue. }.) or ( ?CurrentValue = "". ).
-        ["<label for='" ?Col "'>" ?Col "</label><input type='" ?Type "' name='" ?Col "' value='" ?CurrentValue "'>"] sconcat ?Field.
+        ( ?Type = html. ["<label for='" ?Col "'>" ?Col "</label><textarea class='html-editor' name='" ?Col "'>" ?CurrentValue "</textarea>"] sconcat ?Field. ) or
+        (
+            ( ?Type = json. ["<label for='" ?Col "'>" ?Col "</label><json-editor name='" ?Col "' mode='code' value='" ?CurrentValue "'></json-editor>"] sconcat ?Field. ) or
+            (( ?Type = file. ["<label for='" ?Col "'>" ?Col "</label><div style='margin-bottom:0.5rem; font-size:0.9em; color:#666;'>Current: <a href='" ?CurrentValue "' target='_blank'>" ?CurrentValue "</a></div><input type='file' name='" ?Col "'>"] sconcat ?Field. ) or
+            ( ["<label for='" ?Col "'>" ?Col "</label><input type='" ?Type "' name='" ?Col "' value='" ?CurrentValue "'>"] sconcat ?Field. ).).
+        ).
     )] [collect >> sconcat] ?Fields.
     ?Txn lmdbEnd [].
     
     [
-        "<h1>Edit " ?TableNameS "</h1>
-        <form method='post' action='/table/" ?TableNameS "/upsert'>
+        "<nav><a href='/'>Tables</a> / <a href='/table/" ?TableNameS "'>" ?TableNameS "</a></nav>
+        <h1>Edit " ?TableNameS "</h1>
+        <form method='post' action='/table/" ?TableNameS "/upsert' enctype='multipart/form-data'>
             <input type='hidden' name='id' value='" ?RowId "'>
             " ?Fields "
             <input type='submit' value='Save'>
         </form>"
-    ] sconcat ?HTML.
+    ] buildHTML ?HTML.
 ) => (?R response (?RID status 200; headers ("Content-Type" = "text/html; charset=utf-8".); body ?HTML.).).
 
 // Upsert action
@@ -117,7 +291,7 @@ CMSSpec tables (
     ?R match (?RID a post; path ?Path; body ?FormData.).
     ?Path [splitString "/"] ["" "table" ?TableNameS "upsert"].
     ?TableNameS parseAtom ?TableName.
-    system log [xxx1 ?TableName ?FormData].
+
     // Get or generate ID
     ( 
         ?FormData match ( id = ?ExistingId. ). ?ExistingId neq "". ?Id = ?ExistingId. 
@@ -125,21 +299,38 @@ CMSSpec tables (
         system [now >> sha256] ?Suffix. [?TableNameS "_" ?Suffix] sconcat ?Id. 
     ).
     
-    system log xxx2.
     // Insert data
     ?Txn lmdbStartRW "./db".
-    ?Txn lmdbDelete { ?Id ?OldPred ?OldValue. }
+    ?Txn lmdbDelete { ?Id a ?TableName. }
     ; lmdbInsert { ?Id a ?TableName. }.
-    system log xxx3.
     
     // Insert field data
     [?_ (
         ?FormData match ( ?Col = ?Value. ). ?Col neq id. ?Value neq "". 
-         system log xxx4.
-        ?Txn lmdbInsert { ?Id ?Col ?Value. }.
+        
+        // Handle file uploads
+        ( ?Value match ( filename = ?OriginalFilename. content = ?FileContent. ).
+            (
+                ?FileContent [length >> >] 0.
+                CMSSpec uploadsURLPathInferred ?uploadsURLPath.
+                system now ?Timestamp.
+                ["file_" ?Timestamp "_" ?OriginalFilename] sconcat ?Filename.
+                ["./uploads/" ?Filename] sconcat ?FilePath.
+                ?FilePath writeBytesToFile ?FileContent.
+                ["/" ?uploadsURLPath "/" ?Filename] sconcat ?FileURL.
+                
+                ?Txn lmdbDelete { ?Id ?Col ?_TheOldFileURL. }; 
+                lmdbInsert { ?Id ?Col ?FileURL. }.
+            ) or (
+                // keep old file URL if no new file uploaded
+            ).
+        ) or (
+            // Regular field
+            ?Txn lmdbDelete { ?Id ?Col ?_TheOldValue. };
+            lmdbInsert { ?Id ?Col ?Value. }.
+        ).
     )] collect ?_ins.
     
-    system log xxx5.
     ?Txn lmdbEnd [].
     
     ["/table/" ?TableNameS] sconcat ?RedirectPath.
@@ -149,13 +340,40 @@ CMSSpec tables (
 (
     ?R match (?RID a post; path ?Path.).
     ?Path [splitString "/"] ["" "table" ?TableNameS "row" ?RowId "delete"].
-    system log [zzz1 ?TableNameS ?RowId].
-    ?Txn lmdbStartRW "./db".
-    ?Txn lmdbDelete { ?RowId ?Pred ?Value. }.
-    ?Txn lmdbEnd [].
-    
-    system log [zzz2 ?TableNameS ?RowId].
+    ?Txn lmdbStartRW "./db"
+    ; lmdbDelete { ?RowId ?Pred ?Value. }
+    ; lmdbEnd [].
     ["/table/" ?TableNameS] sconcat ?RedirectPath.
 ) => (?R response (?RID status 302; headers ("Location" = ?RedirectPath.).).).
 
-system runWebServer 3000.
+// Image upload endpoint for TinyMCE
+(
+    ?R match (?RID a post; path "/upload-image"; body ( file = ( filename = ?OriginalFilename. content = ?FileContent. ).).).
+    CMSSpec uploadsURLPathInferred ?uploadsURLPath.
+    system now ?Timestamp.
+    ["img_" ?Timestamp "_" ?OriginalFilename] sconcat ?Filename.
+    ["./uploads/" ?Filename] sconcat ?FilePath.
+    
+    ?FilePath writeBytesToFile ?FileContent.
+    
+    ["/" ?uploadsURLPath "/" ?Filename] sconcat ?ImageURL.
+    ["{ \"location\": \"" ?ImageURL "\" }"] sconcat ?JSONResponse.
+) => (?R response (?RID status 200; headers ("Content-Type" = "application/json".); body ?JSONResponse.).).
+
+// Serve uploaded images
+(
+    CMSSpec uploadsURLPathInferred ?uploadsURLPath.
+    ?R match (?RID a get; path ?Path.).
+    ?Path [splitString "/"] ["" ?uploadsURLPath ?File].
+    ["./uploads/" ?File] sconcat ?FilePath.
+    ?FilePath readFileAsBytes ?FileContent.
+) => (?R response (?RID status 200; headers ("Content-Type" = "image/png".); body ?FileContent.).).
+
+
+// system query [3 (
+//     ?txn lmdbStartR "./db";
+//     lmdbQuery { ?X a blog; ?pred ?val.};
+//     // lmdbDelete { ?X ?_pred ?_val. };
+//     lmdbEnd [].
+//     system log [ ?X ?pred ?val].
+// )].

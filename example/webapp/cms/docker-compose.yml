@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  cms:
+    build:
+      context: .
+    environment:
+      F3_CONFIG: |
+        CMSSpec tables {
+            blog slug text; title text; content html; published date.
+            faq question text; answer html; order number.
+            config profitMargin number.
+        }; login "admin":"90321jdn1ub"; apiKey "jbndiwuqbewqnuwqbn21u390u13902jd309"; uploadsURLPath "cms-files".
+        system runWebServer 4000.
+
+    volumes:
+      - ./db:/data/db
+      - ./uploads:/data/uploads
+
+  caddy:
+    image: caddy:alpine
+    ports:
+      - "3000:80"
+    command: |
+      sh -c 'echo ":80 {
+        reverse_proxy cms:4000
+      }" | caddy run --config /dev/stdin --adapter caddyfile'
+    depends_on:
+      - cms
